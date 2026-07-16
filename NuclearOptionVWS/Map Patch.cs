@@ -9,9 +9,9 @@ namespace NuclearOptionVWS
     [HarmonyPatch(typeof(UnitMapIcon),nameof(UnitMapIcon.UpdateIcon))]
     internal static class MapIconPatch
     {
-        static void Postfix(float mapDisplayFactor, float mapInverseScale, Transform mapTransform, bool mapMaximized, UnitMapIcon __instance)
+        static void Postfix(float mapDisplayFactor, float mapInverseScale, Transform mapTransform, bool mapMaximized, UnitMapIcon __instance, bool ___flashing)
         {
-            Plugin.I.ObserveUnitBearingFromMapIcon(__instance.unit);
+            Plugin.I.ObserveUnitBearingFromMapIcon(__instance.unit, ___flashing);
         }
     }
 }

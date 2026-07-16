@@ -9,6 +9,8 @@ using BepInEx.Logging;
 using UnityEngine.Playables;
 using NuclearOptionVWS;
 using BepInEx.Configuration;
+using System.Linq;
+using Unity.Audio;
 
 namespace Lock_Shoot_Tone_Ping
 {
@@ -16,16 +18,28 @@ namespace Lock_Shoot_Tone_Ping
     {
         public const string ConfigFileName = "Configs.txt";
         public const string DefaultNotated = ":[Default]:";
+        public const char PackDataSplitChar = '=';
         private string DefaultPath;
+
+        private Plugin MainPlugin;
+        private ConfigEntry<string> CFG_EncodingType;
+        private string CurrentPack;
 
         private List<PackAudioHandler> AudioHandlersForDifferentPacks;
         public AudioHandler GeneralAudioHandler;
-        public ExternalPackHandler(string Root, GameObject Host, ConfigEntry<int> Volume, out AudioHandler GeneralAudioHandler)
+
+        public ExternalPackHandler(string Root, GameObject Host, ConfigEntry<int> Volume, Plugin Plugin,out ConfigEntry<string> EncodingType, out AudioHandler GeneralAudioHandler)
         {
+            MainPlugin = Plugin;
+            string[] EncodingTypes = { "Raw", "Streamlined", "Simplified" };
+            EncodingType = MainPlugin.Config.Bind("External Packs", "PackConfigEncoding", "Streamlined", new ConfigDescription("What Pack Encoding Type do you want to save the current configs as (change will occur when you close the game or when you change active pack)", new AcceptableValueList<string>(EncodingTypes)));
+            this.CFG_EncodingType = EncodingType;
+
             string FileModName = Plugin.I.GetFileModName();
             string PRoot = $"{Root}\\Packs";
             DefaultPath = Root + "\\Audio";
             GeneralAudioHandler = new AudioHandler(Host, Volume, DefaultPath);
+            this.GeneralAudioHandler = GeneralAudioHandler;
             if (!Directory.Exists(PRoot))
             {
                 Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement being generated");
@@ -56,7 +70,7 @@ namespace Lock_Shoot_Tone_Ping
                 }
             }
 
-            //Plugin.Logger.LogInfo(DefaultConfigPath);
+            //Plugin.Plugin.I.Log.LogInfo(DefaultConfigPath);
             Plugin.I.Log(LogLevel.Info, "Injecting Default Pack into Handler");
             AudioHandlersForDifferentPacks.Insert(0, PackAudioHandler.GenerateDefaultStandin(this));
             Plugin.I.Log(LogLevel.Info, "Injecting Audio into AudioHandler");
@@ -130,7 +144,175 @@ namespace Lock_Shoot_Tone_Ping
             }
             return ReturnArray;
         }
+
+        #region from LSTP main plugin class
+        private void WriteConfigsToExternalFile(string Path, Dictionary<string,ConfigEntryBase> BigConfigDictionary)
+        {
+            //string text = "";
+            //foreach(string s in BigConfigDictionary.Keys)
+            //{
+            //    text += s + "#" + BigConfigDictionary[s].BoxedValue  +"\n";
+            //}
+            //File.WriteAllText(Path, text);
+            if (CFG_EncodingType.Value == "Streamlined")
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing StreamLined");
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(BigConfigDictionary), false));
+            }
+            else if (CFG_EncodingType.Value == "Simplified")
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing Simplified");
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(BigConfigDictionary), true));
+            }
+            else
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing Raw");
+
+                File.WriteAllLines(Path, GetCurrentConfig(BigConfigDictionary));
+            }
+        }
+        private string[] GetCurrentConfig(Dictionary<string,ConfigEntryBase> BigConfigDictionary)
+        {
+            Regex RevertPrefix = new Regex(@"^\[.+\] (.+)");
+            int index = 0;
+            string[] CFG = new string[BigConfigDictionary.Count];
+            foreach (string s in BigConfigDictionary.Keys)
+            {
+                object CurrentValue = BigConfigDictionary[s].BoxedValue;
+                if (CurrentValue.GetType() == typeof(string))
+                {
+                    Match m = RevertPrefix.Match((string)CurrentValue);
+                    if (m.Success & CurrentPack != ExternalPackHandler.DefaultNotated)
+                    {
+                        CurrentValue = m.Groups[1].Value;
+                    }
+                }
+
+                CFG[index] = s + PackDataSplitChar + CurrentValue;
+
+                index++;
+            }
+            return CFG;
+        }
+        private static void LoadConfigsFromText(PackAudioHandler PackAudioHandler, Dictionary<string, ConfigEntryBase> Dictionary, bool AudioNamePrefix = false, bool ResetUndefined = true)//this doesnt work for the arrays of configs. how odd.
+        {
+            if (PackAudioHandler.Name == ExternalPackHandler.DefaultNotated)
+            {
+                AudioNamePrefix = false;
+                Plugin.I.Log(LogLevel.Info,"AudioName prefix set to false as defualt pack is being loaded ad so has no prefix");
+            }
+
+            if (ResetUndefined & PackAudioHandler.Configs.Length > 0)
+            {
+                foreach (string s in Dictionary.Keys)
+                {
+                    ConfigEntryBase CFG = Dictionary[s];
+                    CFG.BoxedValue = CFG.DefaultValue;
+                }
+            }
+            else
+            {
+                Plugin.I.Log(LogLevel.Info,"Refusing to wipe existing configs. (in line with configs)");
+            }
+
+            Regex ConfigComb = new Regex(@"^(.+)\" + PackDataSplitChar + "(.+)$");
+            Regex NumberOnlyCheck = new Regex(@"^[\d|\.]+$");
+            string[] Data;
+
+            bool IsSimplified;
+
+            if (PackAudioHandler.DetectEncodingType(PackAudioHandler.Configs, out IsSimplified) == 's')
+            {
+                Plugin.I.Log(LogLevel.Info,"Streamlined data detected. Converting to Raw");
+                if (IsSimplified)
+                {
+                    Plugin.I.Log(LogLevel.Info,"Simplfied Streamline data detected.");
+                }
+                Data = PackAudioHandler.ConvertToRaw(PackAudioHandler.Configs, IsSimplified);
+            }
+            else
+            {
+                Plugin.I.Log(LogLevel.Info,"Data is already Raw");
+                Data = PackAudioHandler.Configs;
+            }
+            bool[] HasEntry = new bool[Dictionary.Count];
+            foreach (string s in Data)
+            {
+                if (ConfigComb.Match(s).Success)
+                {
+                    string[] data = s.Split(PackDataSplitChar);
+                    if (Dictionary.Keys.Contains(data[0]))
+                    {
+                        //[0] is the config field, [1] is the value;
+                        ConfigEntryBase SpecificConfig = Dictionary[data[0]];
+
+                        //Plugin.I.Log.LogInfo("Processing " + SpecificConfig.Definition);
+                        //Plugin.I.Log.LogInfo("OLD:" + SpecificConfig.BoxedValue);
+                        if (SpecificConfig.GetType() == typeof(ConfigEntry<bool>))
+                        {
+                            SpecificConfig.BoxedValue = data[1] switch
+                            {
+                                "True" => true,
+                                "False" => false,
+                                _ => false
+                            };
+                            //Plugin.I.Log.LogInfo("This is boolean");
+                        
+                        }
+                        else if (SpecificConfig.GetType() == typeof(ConfigEntry<string>))
+                        {
+                            if (AudioNamePrefix)
+                            {
+                                SpecificConfig.BoxedValue = PackAudioHandler.Prefix(data[1]);
+                            }
+                            else
+                            {
+                                SpecificConfig.BoxedValue = data[1];
+                            }
+                            //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+
+                        }
+                        else if (SpecificConfig.GetType() == typeof(ConfigEntry<int>))
+                        {
+                            if (NumberOnlyCheck.Match(data[1]).Success)
+                            {
+                                SpecificConfig.BoxedValue = System.Convert.ToInt32(data[1]);
+
+                                //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                            }
+                            else
+                            {
+                                Plugin.I.Log(LogLevel.Error, "Integer expected. value could not be parsed to integer. value: " + data[1]);
+                            }
+                        }
+                        else if (SpecificConfig.GetType() == typeof(ConfigEntry<float>))
+                        {
+                            if (NumberOnlyCheck.Match(data[1]).Success)
+                            {
+                                SpecificConfig.BoxedValue = float.Parse(data[1]);
+
+                                //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                            }
+                            else
+                            {
+                                Plugin.I.Log(LogLevel.Error, "Float expected. value could not be parsed to Float. value: " + data[1]);
+                            }
+                        }
+                        else
+                        {
+                            Plugin.I.Log(LogLevel.Error, "Unknown config. " + SpecificConfig.GetType());
+                        }
+
+                        //Plugin.I.Log.LogInfo("NEW:" + SpecificConfig.BoxedValue);
+
+                    }
+                }
+
+            }
+        }
+        #endregion
     }
+
     internal class PackAudioHandler
     {
         public AudioClip[] Audio;
