@@ -5,7 +5,6 @@ using HarmonyLib;
 using Lock_Shoot_Tone_Ping;
 using System;
 using System.IO;
-using System.Numerics;
 using System.Text.RegularExpressions;
 
 using NuclearOption.Networking;
@@ -16,6 +15,7 @@ using System.Collections.Generic;
 using Mirage;
 using System.Linq;
 using System.Reflection;
+using UnityEngine;
 
 namespace NuclearOptionVWS;
 
@@ -52,27 +52,34 @@ public class Plugin : BaseUnityPlugin
             Low = plugin.Config.Bind("Position Audio", "Low Audio", AudioHandler.NoAudio,
             new ConfigDescription("What sound do you want to be played to tell you that a Hazard is more than [Significant Angle] degrees below your current aircraft angle ", new AcceptableValueList<string>(ArrayOfAllAudio)));
 
-            SignificantAngle = plugin.Config.Bind("Position Audio", "Significant Angle", 30f, "the Angle of deviation from the chord line of your aircraft before the VWS considers an object to be high or low");
+            SignificantAngle = plugin.Config.Bind("Position Audio", "Significant Angle", 10f, new ConfigDescription("the Angle of deviation from the chord line of your aircraft before the VWS considers an object to be high or low", new AcceptableValueRange<float>(5, 45)));
         }
 
         private int GetUpperBearing(int i) => (i * 90 + 45 + 360) % 360;
         private int GetLowerBearing(int i) => (i * 90 - 45 + 360) % 360;
         private int GetIndex(int Bearing) => ((Bearing + 45) / 90) % 4;
 
-        public string[] GetPositionAudioString(GlobalPosition PlayerPosition, GlobalPosition EnemyPosition)
+        public string[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition)
         {
             string[] ReturnString;
+            //GlobalPosition PlayerPosition = Player.GlobalPosition();
+            //float dx = PlayerPosition.x - EnemyPosition.x;
+            //float dy = PlayerPosition.y - EnemyPosition.y;
+            //float dz = PlayerPosition.z - EnemyPosition.z;
 
-            float dx = PlayerPosition.x - EnemyPosition.x;
-            float dy = PlayerPosition.y - EnemyPosition.y;
-            float dz = PlayerPosition.z - EnemyPosition.z;
+            //float Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
 
-            float Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
+            ////Z is northways apparently...which isnt very intuative but oh well
+            //double RelativeBearing = ((Math.Atan2(dx, dz) + 3 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) - Player.rb.rotation.eulerAngles.y;
+            //if(RelativeBearing < 0)
+            //{
+            //    RelativeBearing += 360;
+            //}
+            //double ChordAngleDeviation = ((Math.Atan2(dx, Distance) + 3 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) - Player.rb.rotation.eulerAngles.x;//(Math.Atan2(dy, Distance) * 180 / Math.PI) - Player.rb.rotation.eulerAngles.x;
+            double RelativeBearing = GetRelativeBearing(Player, EnemyPosition);
+            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition);
 
-            //Z is northways apparently...which isnt very intuative but oh well
-            double RelativeBearing = ((Math.Atan2(dz, dx) + 2 * Math.PI) % (2 * Math.PI) * 180 / Math.PI);
-            double ChordAngleDeviation = (Math.Atan2(dy, Distance) * 180 / Math.PI);
-
+            Logger.LogInfo("ANGLE: "+ChordAngleDeviation);
             if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
             {
                 ReturnString = new string[2];
@@ -94,6 +101,36 @@ public class Plugin : BaseUnityPlugin
 
             return ReturnString;
             
+        }
+
+        public static float GetRelativeBearing(Aircraft Player, GlobalPosition EnemyPosition)
+        {
+            //This is the way base game NO does it so ill follow suit as the small discrepencies are annoying me
+            Vector3 PlayerPos = new Vector3(Player.GlobalPosition().x, 0f, Player.GlobalPosition().z);
+            Vector3 EnemyPos = new Vector3(EnemyPosition.x, 0f, EnemyPosition.z);
+            Vector3 Difference = (EnemyPos - PlayerPos).normalized;
+
+            Vector3 Forward = Player.transform.forward;
+
+            float Angle = -Vector3.SignedAngle(Forward, Difference, Player.transform.up);
+            if (Angle < 0)
+            {
+                Angle += 360;
+            }
+            return Angle;
+
+        }
+
+        public static float GetRelativeAltitudeDifferenceAngle(Aircraft Player, GlobalPosition EnemyPosition)
+        {
+            Vector3 PlayerPos = Player.GlobalPosition().AsVector3();
+            Vector3 EnemyPos = EnemyPosition.AsVector3();
+            Vector3 Difference = (EnemyPos - PlayerPos).normalized;
+
+            Vector3 up = Player.transform.up;
+
+            float Angle = Vector3.Angle(up, Difference);
+            return (Angle-90)*-1;//this converts it to the format accepted by the mod
         }
     }
     internal class HostileHazardConfig
@@ -133,7 +170,7 @@ public class Plugin : BaseUnityPlugin
                 PriorityDropDown[i] = i;
             }
             HostileHazards = new ConfigEntry<string>[HazardNames.Length];
-            Priority = new ConfigEntry<int>[HazardNames.Length];
+            Priority = new ConfigEntry<int>[HazardNames.Length + 1];
             string Category;
             for (int i = 0; i < HostileHazards.Length; i++)
             {
@@ -151,7 +188,19 @@ public class Plugin : BaseUnityPlugin
                     new ConfigDescription("What sound do you want to be played to alert you of a " + HazardNames[i] + " threat.", new AcceptableValueList<string>(ArrayOfAllAudio)));
 
                 Priority[i] = plugin.Config.Bind(Category, HazardNames[i] + " Priority", DefaultHazardPriority[i],
-                    new ConfigDescription("What priority do you want to assign a hazard (Higher number = Higher Priority)", new AcceptableValueList<int>(PriorityDropDown)));
+                    new ConfigDescription("What priority do you want to assign "+HazardNames[i]+" hazards (Higher number = Higher Priority)", new AcceptableValueList<int>(PriorityDropDown)));
+
+                if (HazardNames[i] == "Missile")
+                {
+                    int LockedPriority = DefaultHazardPriority[i];
+                    if(LockedPriority < Priority.Length - 1)
+                    {
+                        LockedPriority++;
+                    }
+
+                    Priority[HazardNames.Length] = plugin.Config.Bind(Category, "Missile Locked Priority", LockedPriority,
+                        new ConfigDescription("What priority do you want to assign Locked Missile hazards (Higher number = Higher Priority)", new AcceptableValueList<int>(PriorityDropDown)));
+                }
             }
         }
         private ConfigEntry<string> GetHazardCFG(string HazardName, out int HazardPriority)
@@ -178,15 +227,24 @@ public class Plugin : BaseUnityPlugin
                 return AudioHandler.NoAudio;
             }
         }
-        public string GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority,float AAThreatOverride = -1)
+        public string GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority,bool Locked = false,float AAThreatOverride = -1)
         {
             if (unit.definition.typeIdentity.missile >= 0.5)
             {
-                return GetAudioNameProtected(GetHazardCFG("Missile", out HazardPriority));
+                if (Locked)
+                {
+                    HazardPriority = Priority[Priority.Length - 1].Value;
+                    int tmp;
+                    return GetAudioNameProtected(GetHazardCFG("Missile", out tmp));
+                }
+                else
+                {
+                    return GetAudioNameProtected(GetHazardCFG("Missile", out HazardPriority));
+                }
             }
             else if (unit.definition.typeIdentity.air >= 0.5)
             {
-                return GetAudioNameProtected(GetHazardCFG("Low Priority Misc Ground", out HazardPriority));
+                return GetAudioNameProtected(GetHazardCFG("Air", out HazardPriority));
             }
             else
             {
@@ -220,7 +278,7 @@ public class Plugin : BaseUnityPlugin
                 }
                 else
                 {
-                    return GetAudioNameProtected(GetHazardCFG("Air", out HazardPriority));
+                    return GetAudioNameProtected(GetHazardCFG("Low Priority Misc Ground", out HazardPriority));
                 }
             }
         }
@@ -296,15 +354,19 @@ public class Plugin : BaseUnityPlugin
         }
 
     }
-    internal struct VWSWarning
+    internal class VWSWarning//technically should be a struct but i dont want values to be copied
 
     {
+        public static BearingAudConfig BearingConfig;
+
         public string[] audioNames;
         public double Priority;
         public bool Played;
         public int UpdatesSinceBumped;
 
         public Unit UnitCalled;
+
+        public bool IsInstruction = false;
 
         public VWSWarning(int Priority, string[] AudioNames, Unit Unit, double Distance)
         {
@@ -323,15 +385,22 @@ public class Plugin : BaseUnityPlugin
         {
             UpdatesSinceBumped += 1;
         }
-        public void Bump(GlobalPosition PlayerPosition)
+        public void Bump(Aircraft Player, bool RenewBearing = true)
         {
             UpdatesSinceBumped = 0;
+            Priority = DistanceInclusivePriority(FastMath.Distance(Player.GlobalPosition(), UnitCalled.GlobalPosition()));
 
-            Priority = DistanceInclusivePriority(FastMath.Distance(PlayerPosition, UnitCalled.GlobalPosition()));
+            if (RenewBearing)
+            {
+                string[] tmp = BearingConfig.GetPositionAudioString(Player, UnitCalled.GlobalPosition());
+                audioNames = PrependArray(audioNames[0], tmp);
+
+            }
+
         }
-        public void BumpAdvanced(GlobalPosition PlayerPosition, ref List<VWSWarning> WarningList, int IndexOverride = -1)
+        public void BumpAdvanced(Aircraft Player, ref List<VWSWarning> WarningList, int IndexOverride = -1)
         {
-            Bump(PlayerPosition);
+            Bump(Player, !IsInstruction);
             int CurrentIndex;
             if (IndexOverride < 0)
             {
@@ -348,7 +417,7 @@ public class Plugin : BaseUnityPlugin
             Logger.LogInfo(CurrentIndex + "/" + WarningList.Count);
             while (WarningList[CurrentIndex].Priority > WarningList[CurrentIndex +1].Priority)
             {
-                Logger.LogInfo("BA loop");
+                //Logger.LogInfo("BA loop");
                 SwapIndexes(CurrentIndex, CurrentIndex + 1, ref WarningList);
                 CurrentIndex++;
                 if(CurrentIndex + 1 >= WarningList.Count)
@@ -401,15 +470,23 @@ public class Plugin : BaseUnityPlugin
             int lower = 0;
             int index;
 
-
             if (WarningList.Count == 0)
             {
                 WarningList.Add(Warning);
             }
 
+            if (WarningList[WarningList.Count-1].Priority < Warning.Priority)
+            {
+                WarningList.Add(Warning);
+            }
+            if (WarningList[0].Priority > Warning.Priority)
+            {
+                WarningList.Insert(0, Warning);
+            }
+
             while (upper - lower > 1)
             {
-                Logger.LogInfo("VWS ADD loop");
+                //Logger.LogInfo("VWS ADD loop");
                 index = (upper + lower) / 2;
                 Logger.LogInfo("U:" + upper + " L:" + lower + " I:" + index);
                 if (WarningList[index].Priority > Warning.Priority)
@@ -430,22 +507,15 @@ public class Plugin : BaseUnityPlugin
 
             index = lower;
 
-            if (WarningList[index].Priority > Warning.Priority)
-            {
-                WarningList.Insert(index, Warning);
-            }
-            else
+            while (WarningList[index].Priority < Warning.Priority)
             {
                 index++;
-                if(index == WarningList.Count)
+                if (index == WarningList.Count)
                 {
                     WarningList.Add(Warning);
                 }
-                else
-                {
-                    WarningList.Insert(index, Warning);
-                }
             }
+            WarningList.Insert(index, Warning);
             
         }
         private static int GetIndexOfLowestPriorityInSection(List<VWSWarning> WarningList, int PrioritySection)
@@ -459,7 +529,7 @@ public class Plugin : BaseUnityPlugin
             int index;
             while (upper - lower > 1)
             {
-                Logger.LogInfo("Priority LOW loop");
+                //Logger.LogInfo("Priority LOW loop");
                 index = (upper + lower) / 2;
                 Logger.LogInfo("U:" + upper + " L:" + lower + " I:" + index);
                 if (WarningList[index].Priority > PrioritySection)
@@ -492,11 +562,11 @@ public class Plugin : BaseUnityPlugin
                 return -1;
             }
         }
-        public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, VWSWarning Warning, GlobalPosition PlayerPosition)
+        public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, VWSWarning Warning, Aircraft Player)
         {
-            return CheckIfPresentAndBump(ref WarningList, Warning.Priority, Warning.UnitCalled, PlayerPosition);
+            return CheckIfPresentAndBump(ref WarningList, Warning.Priority, Warning.UnitCalled, Player);
         }
-        public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, double Priority,Unit unit, GlobalPosition PlayerPosition)
+        public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, double Priority,Unit unit, Aircraft Player)
         {
             int index = GetIndexOfLowestPriorityInSection(WarningList, (int)Math.Floor(Priority));//this is done because priority scales on distance and distance may very well have changed since the last bump
             if (index < 0)
@@ -507,10 +577,10 @@ public class Plugin : BaseUnityPlugin
             {
                 while (Math.Floor(WarningList[index].Priority) == Math.Floor(Priority))
                 {
-                    Logger.LogInfo("Check B loop");
+                    //Logger.LogInfo("Check B loop");
                     if (WarningList[index].UnitCalled == unit)
                     {
-                        WarningList[index].BumpAdvanced(PlayerPosition, ref WarningList, index);
+                        WarningList[index].BumpAdvanced(Player, ref WarningList, index);
                         return true;
                     }
                     index++;
@@ -521,6 +591,16 @@ public class Plugin : BaseUnityPlugin
                 }
                 return false;
             }
+        }
+        public static string[] PrependArray(string Value, string[] Array)
+        {
+            string[] ReturnArray = new string[Array.Length + 1];
+            ReturnArray[0] = Value;
+            for(int i = 0; i < Array.Length; i++)
+            {
+                ReturnArray[i + 1] = Array[i];
+            }
+            return ReturnArray;
         }
     }
     #endregion
@@ -602,7 +682,9 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
         Logger.LogInfo("Initialising List Of Warnings");
+        VWSWarning.BearingConfig = CFG_PositionCalloutAudio;
         VWSList = new List<VWSWarning>();
+        
 
         Inj_Harmony = new Harmony($"com.Aeriicatmeow.{FileModName}");
         Inj_Harmony.PatchAll();
@@ -662,10 +744,20 @@ public class Plugin : BaseUnityPlugin
             NullPosition = false;
             PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
             PlayerHQ = SceneSingleton<DynamicMap>.i.HQ;
+
+            try
+            {
+                Audio.Update();
+            }
+            catch(Exception EXP)
+            {
+                Logger.LogFatal(EXP);
+            }
         }
         else
         {
             NullPosition = true;
+            Audio.ClearQueue();
         }
 
         try
@@ -681,21 +773,20 @@ public class Plugin : BaseUnityPlugin
     private void VWSListUpdate()
     {
         Logger.LogInfo(VWSList.Count);
-        foreach(VWSWarning w in VWSList)
-        {
-            w.CreateLogDump();
-        }
+
 
         int limit = VWSList.Count;
         int index = 0;
         Logger.LogInfo("NEW UPDATE");
         while(index < limit)
         {
-            Logger.LogInfo("UPD loop");
+            Logger.LogInfo("UPD loop: "+index +"/"+limit);
             VWSList[index].IncrementBump();
             VWSList[index].CreateLogDump();
+            Logger.LogInfo("SECOND");
             if (VWSList[index].UpdatesSinceBumped > 4 || VWSList[index].UnitCalled.Identity.NetId == 0)
             {
+                Logger.LogInfo("REMOVING");
                 VWSList.RemoveAt(index);
                 limit--;
             }
@@ -705,6 +796,48 @@ public class Plugin : BaseUnityPlugin
             }
 
         }
+
+
+        Logger.LogInfo("FINAL PART");
+        if (Audio.GetQueueLength() == 0 & VWSList.Count > 0)
+        {
+            ReadOffHighestPriorities();
+        }
+
+        
+        
+    }
+    private void ReadOffHighestPriorities()
+    {
+        int index = VWSList.Count - 1;
+        int HighestPriorityTier = (int)Math.Floor(VWSList[index].Priority);
+        Logger.LogInfo("HIGHEST PRIORITY: " + HighestPriorityTier);
+        while (Math.Floor(VWSList[index].Priority) == HighestPriorityTier & VWSList[index].Played)
+        {
+            index--;
+            if (index < 0)
+            {
+                for (int i = 0; i < VWSList.Count; i++)
+                {
+                    VWSList[i].Played = false;
+                }
+                return;
+            }
+        }
+
+        VWSWarning WarningToBePlayed = VWSList[index];
+        if (Math.Floor(WarningToBePlayed.Priority) < HighestPriorityTier)
+        {
+            return;
+        }
+        Logger.LogInfo("CURR PRIOR: "+WarningToBePlayed.Priority);
+        WarningToBePlayed.Played = true;
+        foreach (string s in WarningToBePlayed.audioNames)
+        {
+            Audio.AddToQueue(s);
+        }
+
+
     }
     public void ObserveUnitBearingFromMapIcon(Unit unit, bool IsLocked)
     {
@@ -725,24 +858,30 @@ public class Plugin : BaseUnityPlugin
                 if (CheckIfValidForCallout(unit, Distance) || IsLocked) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
                 {
                     //Logger.LogInfo("3rd cull");
-                    //BearingDebug(unit, PlayerPosition, EnemyPosition);
+                    BearingDebug(unit, PlayerAircraft, EnemyPosition);
 
                     int Priority;
                     Logger.LogInfo("HAZARD AUDIO");
-                    string HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority);
+                    string HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority, IsLocked);
 
-                    bool IsPresent = VWSWarning.CheckIfPresentAndBump(ref VWSList, Priority, unit, PlayerPosition);
+
+                    if (IsLocked)
+                    {
+                        Logger.LogInfo("ITS LOCKED");
+                    }
+
+                    bool IsPresent = VWSWarning.CheckIfPresentAndBump(ref VWSList, Priority, unit, PlayerAircraft);
 
                     if (!IsPresent) 
                     { 
                         Logger.LogInfo("BEARING AUDIO");
-                        string[] AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerPosition, EnemyPosition);
+                        string[] AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition);
                         foreach (string s in AudioNames)
                         {
                             Logger.LogInfo(s);
                         }
-
-                        AudioNames.Prepend(HazardAudio);
+                        Logger.LogInfo("HAZARD AUDIO: " + HazardAudio);
+                        AudioNames = VWSWarning.PrependArray(HazardAudio, AudioNames);
                         Logger.LogInfo("SCRIPT");
                         foreach(string s in AudioNames)
                         {
@@ -766,20 +905,29 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
     }
-    private void BearingDebug(Unit unit, GlobalPosition PlayerPosition, GlobalPosition EnemyPosition)
+    private void BearingDebug(Unit unit, Aircraft Player, GlobalPosition EnemyPosition)
     {
+        GlobalPosition PlayerPosition = Player.GlobalPosition();
         float dx = PlayerPosition.x - EnemyPosition.x;
         float dz = PlayerPosition.z - EnemyPosition.z;
+        float dy = PlayerPosition.y - EnemyPosition.y;
+        float Distance = FastMath.Distance(PlayerPosition, EnemyPosition);
 
         //Z is northways apparently...which isnt very intuative but oh well
-        float RelativeBearing = (float)((Math.Atan2(dz, dx) + 2 * Math.PI) % (2 * Math.PI) * 180 / Math.PI);
-        Logger.LogInfo("Bearing to Hazard: " + unit.unitName + $"({unit.definition.code})" + " : " + RelativeBearing + " TO " + unit.GlobalPosition());
+        //float RelativeBearing = (float)((Math.Atan2(dx, dz) + 3 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) ;
+        //float ChordDeviation = (float) ((Math.Atan2(dy, Distance) + 2 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) ;
+        float RelativeBearing = BearingAudConfig.GetRelativeBearing(Player, EnemyPosition);
+        float ChordDeviation = BearingAudConfig.GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition);
+        Logger.LogInfo("[DEBUG]");
+        Logger.LogInfo("Bearing to Hazard: " + unit.unitName + $"({unit.definition.code})" + " : " + (RelativeBearing) + " TO " + unit.GlobalPosition());
         Logger.LogInfo("ROLES:  AA: " + unit.definition.roleIdentity.antiAir + " AG: " + unit.definition.roleIdentity.antiSurface + " AM: " + unit.definition.roleIdentity.antiMissile + " AR: " + unit.definition.roleIdentity.antiRadar);
-
+        Logger.LogInfo("ANGLE DIFF: " + (ChordDeviation));
         Logger.LogInfo("TYPE: S: " + unit.definition.typeIdentity.surface + " A: " + unit.definition.typeIdentity.air + " M: " + unit.definition.typeIdentity.missile + " R: " + unit.definition.typeIdentity.radar);
         Logger.LogInfo("Local Bearing: " + PlayerAircraft.rb.rotation.eulerAngles.y);
         Logger.LogInfo("Position " + PlayerAircraft.GlobalPosition());
         Logger.LogInfo("Pitch " + PlayerAircraft.rb.rotation.eulerAngles.x);
+        Logger.LogInfo("Yaw: " + PlayerAircraft.rb.rotation.eulerAngles.y);
+        //Logger.LogInfo("PRE CONSIDERATIONS RAW: DALT: " + ChordDeviation + " DBEAR: " + RelativeBearing);
         Logger.LogInfo("UNIT ID " + unit.Identity);
         //(Pitch,Yaw, Roll)
         //note that pitch is inverted

@@ -12,6 +12,7 @@ using BepInEx.Configuration;
 using System.Linq;
 using System.Diagnostics.Tracing;
 using NuclearOptionVWS;
+using HarmonyLib;
 
 namespace Lock_Shoot_Tone_Ping
 {
@@ -23,6 +24,9 @@ namespace Lock_Shoot_Tone_Ping
         private AudioClip[] AllAudio;
         private bool SeeCompleteNoExceptions;
         public static string NoAudio = ":[NONE]:";
+
+        private Dictionary<string, AudioClip> AudioDictionary;
+        private Queue<AudioClip> AudioQueue;
 
         //private float DefaultPitch;
         public AudioHandler(GameObject Host, ConfigEntry<int> Volume_Percent, string Root)
@@ -39,6 +43,19 @@ namespace Lock_Shoot_Tone_Ping
             Source.loop = true;
             SeeCompleteNoExceptions = false;
             //DefaultPitch = Source.pitch;
+
+            InitialiseAudioDictionary();
+            
+        }
+
+        private void InitialiseAudioDictionary()
+        {
+            AudioDictionary = new Dictionary<string, AudioClip>();
+            foreach (AudioClip a in AllAudio)
+            {
+                AudioDictionary.TryAdd(a.name, a);
+            }
+            AudioQueue = new Queue<AudioClip>();
         }
 
         #region AudioPlaying
@@ -133,19 +150,32 @@ namespace Lock_Shoot_Tone_Ping
             //Plugin.I.Log(LogLevel.Info, "attempt play finished");
         }
         
-        public AudioClip SimpleSearchForAudio(string Name)
+        //public AudioClip SimpleSearchForAudio(string Name)
+        //{
+        //    foreach (AudioClip a in AllAudio)
+        //    {
+        //        if (a != null)
+        //        {
+        //            if (Name == a.name)
+        //            {
+        //                return a;
+        //            }
+        //        }
+        //    }
+        //    return null;
+        //}
+        public Dictionary<string, AudioClip> GetAudioDictionary() => AudioDictionary;
+        public AudioClip Search(string Name)
         {
-            foreach (AudioClip a in AllAudio)
+            AudioClip ReturnClip;
+            if(AudioDictionary.TryGetValue(Name, out ReturnClip))
             {
-                if (a != null)
-                {
-                    if (Name == a.name)
-                    {
-                        return a;
-                    }
-                }
+                return ReturnClip;
             }
-            return null;
+            else
+            {
+                return null;
+            }
         }
 
         public string[] CreateArrayOfAudioNames()
@@ -301,6 +331,29 @@ namespace Lock_Shoot_Tone_Ping
         //    };
         //}
         #endregion
+        #region AudioQueue
+        public void Update()
+        {
+            if (!Source.isPlaying & AudioQueue.Count > 0)
+            {
+                PlayAudio(AudioQueue.Dequeue(),true);
+            }
+        }
+        public void AddToQueue(string Name)
+        {
+            AudioQueue.Enqueue(Search(Name));
+        }
+        public void AddToQueue(AudioClip Audio)
+        {
+            AudioQueue.AddItem(Audio);
+        }
+        public void ClearQueue()
+        {
+            AudioQueue.Clear();
+        }
+        public Queue<AudioClip> GetQueue() => AudioQueue;
+        public int GetQueueLength() => AudioQueue.Count;
+        #endregion
 
         public void InjectAudioClips(AudioClip[] InjectedAudio)
         {
@@ -317,6 +370,8 @@ namespace Lock_Shoot_Tone_Ping
                 pointer++;
             }
             AllAudio = NewAudioSet;
+
+            InitialiseAudioDictionary();
         }
     }
 }
