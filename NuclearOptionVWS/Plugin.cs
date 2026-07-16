@@ -329,14 +329,34 @@ public class Plugin : BaseUnityPlugin
 
             Priority = DistanceInclusivePriority(FastMath.Distance(PlayerPosition, UnitCalled.GlobalPosition()));
         }
-        public void BumpAdvanced(GlobalPosition PlayerPosition, ref List<VWSWarning> WarningList)
+        public void BumpAdvanced(GlobalPosition PlayerPosition, ref List<VWSWarning> WarningList, int IndexOverride = -1)
         {
             Bump(PlayerPosition);
-            int CurrentIndex = WarningList.IndexOf(this);
-            while(WarningList[CurrentIndex].Priority > WarningList[CurrentIndex +1].Priority & (CurrentIndex < WarningList.Count))
+            int CurrentIndex;
+            if (IndexOverride < 0)
             {
+                CurrentIndex = WarningList.IndexOf(this);
+            }
+            else
+            {
+                CurrentIndex = IndexOverride;
+            }
+            if(CurrentIndex +1 >= WarningList.Count)
+            {
+                return;
+            }
+            Logger.LogInfo(CurrentIndex + "/" + WarningList.Count);
+            while (WarningList[CurrentIndex].Priority > WarningList[CurrentIndex +1].Priority)
+            {
+                Logger.LogInfo("BA loop");
                 SwapIndexes(CurrentIndex, CurrentIndex + 1, ref WarningList);
                 CurrentIndex++;
+                if(CurrentIndex + 1 >= WarningList.Count)
+                {
+                    Logger.LogInfo("Terminating");
+                    break;
+                }
+                Logger.LogInfo(CurrentIndex + "/" + WarningList.Count);
             }
         }
         public void CreateLogDump()
@@ -382,15 +402,27 @@ public class Plugin : BaseUnityPlugin
             int index;
 
 
-            while (upper != lower)
+            if (WarningList.Count == 0)
             {
+                WarningList.Add(Warning);
+            }
+
+            while (upper - lower > 1)
+            {
+                Logger.LogInfo("VWS ADD loop");
                 index = (upper + lower) / 2;
+                Logger.LogInfo("U:" + upper + " L:" + lower + " I:" + index);
                 if (WarningList[index].Priority > Warning.Priority)
                 {
                     upper = index;
                 }
                 else if (WarningList[index].Priority < Warning.Priority)
                 {
+                    lower = index;
+                }
+                else
+                {
+                    upper = index;
                     lower = index;
                 }
 
@@ -418,18 +450,29 @@ public class Plugin : BaseUnityPlugin
         }
         private static int GetIndexOfLowestPriorityInSection(List<VWSWarning> WarningList, int PrioritySection)
         {
+            if(WarningList.Count == 0)
+            {
+                return -1;
+            }
             int upper = WarningList.Count - 1;
             int lower = 0;
             int index;
-            while (upper != lower)
+            while (upper - lower > 1)
             {
+                Logger.LogInfo("Priority LOW loop");
                 index = (upper + lower) / 2;
+                Logger.LogInfo("U:" + upper + " L:" + lower + " I:" + index);
                 if (WarningList[index].Priority > PrioritySection)
                 {
                     upper = index;
                 }
                 else if (WarningList[index].Priority < PrioritySection)
                 {
+                    lower = index;
+                }
+                else
+                {
+                    upper = index;
                     lower = index;
                 }
 
@@ -456,7 +499,7 @@ public class Plugin : BaseUnityPlugin
         public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, double Priority,Unit unit, GlobalPosition PlayerPosition)
         {
             int index = GetIndexOfLowestPriorityInSection(WarningList, (int)Math.Floor(Priority));//this is done because priority scales on distance and distance may very well have changed since the last bump
-            if (index == -1)
+            if (index < 0)
             {
                 return false;
             }
@@ -464,10 +507,16 @@ public class Plugin : BaseUnityPlugin
             {
                 while (Math.Floor(WarningList[index].Priority) == Math.Floor(Priority))
                 {
+                    Logger.LogInfo("Check B loop");
                     if (WarningList[index].UnitCalled == unit)
                     {
-                        WarningList[index].BumpAdvanced(PlayerPosition, ref WarningList);
+                        WarningList[index].BumpAdvanced(PlayerPosition, ref WarningList, index);
                         return true;
+                    }
+                    index++;
+                    if(index >= WarningList.Count)
+                    {
+                        break;
                     }
                 }
                 return false;
@@ -607,7 +656,7 @@ public class Plugin : BaseUnityPlugin
     }
     private void Update()
     {
-        Logger.LogInfo("Update Recieved");
+        
         if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null)
         {
             NullPosition = false;
@@ -631,21 +680,36 @@ public class Plugin : BaseUnityPlugin
 
     private void VWSListUpdate()
     {
-        for (int i = 0; i < VWSList.Count; i++)
+        Logger.LogInfo(VWSList.Count);
+        foreach(VWSWarning w in VWSList)
         {
-            VWSList[i].IncrementBump();
-            VWSList[i].CreateLogDump();
-            if (VWSList[i].UpdatesSinceBumped > 4)
+            w.CreateLogDump();
+        }
+
+        int limit = VWSList.Count;
+        int index = 0;
+        Logger.LogInfo("NEW UPDATE");
+        while(index < limit)
+        {
+            Logger.LogInfo("UPD loop");
+            VWSList[index].IncrementBump();
+            VWSList[index].CreateLogDump();
+            if (VWSList[index].UpdatesSinceBumped > 4 || VWSList[index].UnitCalled.Identity.NetId == 0)
             {
-                VWSList.RemoveAt(i);
-                i--;
+                VWSList.RemoveAt(index);
+                limit--;
+            }
+            else
+            {
+                index++;
             }
 
         }
     }
     public void ObserveUnitBearingFromMapIcon(Unit unit, bool IsLocked)
     {
-        Logger.LogInfo("MapIcon Request recieved");
+        //Logger.LogInfo("MapIcon Request recieved");
+        //Logger.LogInfo(NullPosition);
         try
         {
             if (((PlayerHQ != null & PlayerHQ != unit.NetworkHQ & unit.NetworkHQ != null)
@@ -655,21 +719,45 @@ public class Plugin : BaseUnityPlugin
                 GlobalPosition EnemyPosition = unit.GlobalPosition();
                 GlobalPosition PlayerPosition = PlayerAircraft.GlobalPosition();
                 double Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
-
+               // Logger.LogInfo("2nd cull");
 
 
                 if (CheckIfValidForCallout(unit, Distance) || IsLocked) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
                 {
-                    BearingDebug(unit, PlayerPosition, EnemyPosition);
+                    //Logger.LogInfo("3rd cull");
+                    //BearingDebug(unit, PlayerPosition, EnemyPosition);
 
                     int Priority;
+                    Logger.LogInfo("HAZARD AUDIO");
                     string HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority);
 
-                    VWSWarning.CheckIfPresentAndBump(ref VWSList, Priority, unit, PlayerPosition);
-                    string[] AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerPosition, EnemyPosition);
-                    AudioNames.Prepend(HazardAudio);
+                    bool IsPresent = VWSWarning.CheckIfPresentAndBump(ref VWSList, Priority, unit, PlayerPosition);
 
-                    VWSWarning Warning = new VWSWarning(Priority, AudioNames, unit, Distance);
+                    if (!IsPresent) 
+                    { 
+                        Logger.LogInfo("BEARING AUDIO");
+                        string[] AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerPosition, EnemyPosition);
+                        foreach (string s in AudioNames)
+                        {
+                            Logger.LogInfo(s);
+                        }
+
+                        AudioNames.Prepend(HazardAudio);
+                        Logger.LogInfo("SCRIPT");
+                        foreach(string s in AudioNames)
+                        {
+                            Logger.LogInfo(s);
+                        }
+
+                        Logger.LogInfo("FINAL WARNING");
+                        VWSWarning Warning = new VWSWarning(Priority, AudioNames, unit, Distance);
+                        VWSWarning.AddWarning(ref VWSList, Warning);
+                        Logger.LogInfo("Done :)");
+                    }
+                    else
+                    {
+                        Logger.LogInfo("A duplicate of the VWS request has been found. Request has been bumped. entry will not be added");
+                    }
                 }
             }
         }
