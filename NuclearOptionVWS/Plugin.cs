@@ -236,13 +236,15 @@ public class Plugin : BaseUnityPlugin
                 return AudioHandler.NoAudio;
             }
         }
+        public int GetLockedMissilePriority() => Priority[Priority.Length - 1].Value;
+        public int GetMissilePriority() => Priority[Priority.Length - 2].Value;
         public string GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority,bool Locked = false,float AAThreatOverride = -1)
         {
             if (unit.definition.typeIdentity.missile >= 0.5)
             {
                 if (Locked)
                 {
-                    HazardPriority = Priority[Priority.Length - 1].Value;
+                    HazardPriority = GetLockedMissilePriority();
                     int tmp;
                     return GetAudioNameProtected(GetHazardCFG("Missile", out tmp));
                 }
@@ -309,7 +311,7 @@ public class Plugin : BaseUnityPlugin
 
             ConfigEntry<string>[] CFG_EnvironmentHazards;
             plugin.Log(LogLevel.Info, "Initialising Instruction Hazard Configs");
-            const int InstructionCMSplit = 12;
+            const int InstructionCMSplit = 11;
             string[] HazardNames =
             {
             "OverG",
@@ -325,9 +327,9 @@ public class Plugin : BaseUnityPlugin
             "Bingo Fuel",
             "Eject",
             "Flare",
-            "Notch",
+            "Decrease Throttle",
             "Jammer",
-            "Low"
+            "Notch",
             };
             string[] HazardDescriptions =
             {
@@ -342,21 +344,27 @@ public class Plugin : BaseUnityPlugin
                 "To be played when to alert you to how much fuel you have left (plays during BINGO or when you have <30% fuel)",
                 "To be played when fuel is very low (<10%)",
                 "To be played when there is approximately just enough fuel for you to return to your closest airfield or carrier (does not take into consideration airframe)",
+                "To be played when aircraft is sufficiently damaged that ejecting is recomendable",
                 "To be played when flaring is advised",
-                "To be played when notiching is advised",
+                "To be played when decreasing your throttle is advised (to counter IR missiles)",
                 "To be played when Jamming is advised",
-                "To be Appended onto the end of either the Jammer Audio (when Capacitor is low) or onto the end of the Flare Audio (When Flares are low)",
-                "To be played when aircraft is sufficiently damaged that ejecting is recomendable"
+                "To be played when notiching is advised"
+
             };
 
             CFG_EnvironmentHazards = new ConfigEntry<string>[HazardNames.Length];
-            string Category = "Instruction Hazards";
+            const string Headder = "Instruction Hazards";
+            string Category = Headder;
             for (int i = 0; i < CFG_EnvironmentHazards.Length; i++)
             {
 
                 if (i > InstructionCMSplit)
                 {
-                    Category = "Counter Measure " + Category;
+                    Category = "Counter Measure " + Headder;
+                }
+                else
+                {
+                    Category = Headder;
                 }
                 plugin.Log(LogLevel.Info, i + "/" + CFG_EnvironmentHazards.Length);
                 CFG_EnvironmentHazards[i] = plugin.Config.Bind(Category, HazardNames[i], AudioHandler.NoAudio,
@@ -368,7 +376,7 @@ public class Plugin : BaseUnityPlugin
             const string HazardSettings = "Instruction Hazards Settings";
             plugin.Log(LogLevel.Info, "OUT");
             CFG_AudioOut = plugin.Config.Bind(HazardSettings, "Suffix Depleted", AudioHandler.NoAudio, 
-                new ConfigDescription("Audio that will be tagged onto the end of a counter measure label to tell you that it has been depleted", new AcceptableValueList<string>(ArrayOfAllAudio)));
+                new ConfigDescription("To be Appended onto the end of either the Jammer Audio (when Capacitor is low) or onto the end of the Flare Audio (When Flares are low)", new AcceptableValueList<string>(ArrayOfAllAudio)));
             plugin.Log(LogLevel.Info, "STC");
             CFG_SecondsToCollision = plugin.Config.Bind(HazardSettings, "Seconds to collsion", 2f, "The number of seconds [s] you can continue to descend at this speed before crahsing into the ground. This value determines when the altitude warnings are played");
             plugin.Log(LogLevel.Info, "ALT");
@@ -412,10 +420,12 @@ public class Plugin : BaseUnityPlugin
                 string[] AltitudeWarningLine = new string[2];
                 if(VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
                 {
+                    FatalTrajectory = true;
                     AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude").Value;
                 }
                 else
                 {
+                    FatalTrajectory = true;
                     AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude").Value;
                 }
 
@@ -438,6 +448,10 @@ public class Plugin : BaseUnityPlugin
 
                 VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, AltitudeWarningLine, PlayerAircraft, 0, true)), PlayerAircraft);
             }
+            else
+            {
+                FatalTrajectory = false;
+            }
 
             //one off things will be injected directly into the audio handler so they cannot be ignored
 
@@ -454,9 +468,7 @@ public class Plugin : BaseUnityPlugin
             //OverG
             if(Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
             {
-                string[] OverGWarning = new string[1];
-                OverGWarning[0] = CFG_InstructionHazards.Get("OverG").Value;
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, OverGWarning, PlayerAircraft, 0, true)), PlayerAircraft);
+                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, CFG_InstructionHazards.Get("OverG").Value, PlayerAircraft, 0, true)), PlayerAircraft);
             }
 
             //Flares
@@ -469,7 +481,7 @@ public class Plugin : BaseUnityPlugin
                 FlaresLowFired = true;
                 Logger.LogInfo("LowFlares");
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Flare").Value);
-                Audio.AddToQueue(CFG_InstructionHazards.Get("Low").Value);
+                Audio.AddToQueue(CFG_AudioOut.Value);
             }
 
             //Jammer
@@ -482,16 +494,75 @@ public class Plugin : BaseUnityPlugin
             {
                 CapacitorLowFired = true;
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Jammer").Value);
-                Audio.AddToQueue(CFG_InstructionHazards.Get("Low").Value);
+                Audio.AddToQueue(CFG_AudioOut.Value);
+            }
+            Logger.LogInfo("IR Sig: " + PlayerAircraft.GetIRSource().intensity);
+
+            Logger.LogInfo("DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
+            if (CheckIfEjectAdvisable(PlayerAircraft))
+            {
+                string EjectAudio = CFG_InstructionHazards.Get("Eject").Value;
+                if (!Audio.CheckIfQueueContains(EjectAudio))
+                {
+                    Audio.AddToQueue(EjectAudio);
+                }
+            }
+        }
+        private bool FatalAoA = false;
+        private bool FatalTrajectory = false;
+        Queue<PilotHealthSnapshot> PilotHealthTrend;
+
+        private struct PilotHealthSnapshot
+        {
+            public float PilotHealth;
+            public float TimeOfReading;
+            public PilotHealthSnapshot(float PilotHealth, float Time)
+            {
+                this.PilotHealth = PilotHealth;
+                this.TimeOfReading = Time;
+            }
+        }
+        private bool CheckIfEjectAdvisable(Aircraft PlayerAircraft)
+        {
+            if(PlayerAircraft.partDamageTracker.GetDetachedRatio() > 0.4)
+            {
+                return true;
             }
 
+            if(FatalAoA & FatalTrajectory & PlayerAircraft.partDamageTracker.GetDetachedRatio() > 0.2)
+            {
+                return true;
+            }
+
+            if(PlayerAircraft.cockpit.hitPoints < 10)
+            {
+                return true;
+            }
+
+            
+            //foreach (Pilot p in PlayerAircraft.pilots)
+            //{
+            //    if (p.player == PlayerAircraft.Player)
+            //    {
+            //        p.
+            //        PilotHealthTrend.AddItem(new PilotHealthSnapshot(p.))
+            //    }
+            //}
+
+            return false;
         }
+
+
+
         public void ResetAll()
         {
             ResetBINGOData();
             DangerCloseFired = true;
             FlaresLowFired = true;
             CapacitorLowFired = true;
+
+            FatalAoA = false;
+            FatalTrajectory = false;
         }
 
         private double TotalFuelUsed = 0;//Must be double due to how large the numbers will become over run time.
@@ -589,20 +660,80 @@ public class Plugin : BaseUnityPlugin
             Logger.LogInfo("AoA VAL: " + num);
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold*0.85f)
             {
-                string[] AoAWarning = new string[1];
-                AoAWarning[0] = CFG_InstructionHazards.Get("AoA").Value;
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(CFG_InstructionHazardPriority.Value, AoAWarning, Aircraft, 0, true)), Aircraft);
+
+                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(CFG_InstructionHazardPriority.Value, CFG_InstructionHazards.Get("AoA").Value, Aircraft, 0, true)), Aircraft);
+                if (num > StallHornThreshold)
+                {
+                    FatalAoA = true;
+                }
+            }
+            else
+            {
+                FatalAoA = false;
             }
         }
+        public void AppendMissileWarning(ref VWSWarning Warning, Aircraft PlayerAircraft)
+        {
+            
+            if (CheckIfMissileLocked(Warning.UnitCalled,PlayerAircraft) & CFG_InstructMissileCounterMeasures.Value)
+            {
 
+                float Distance = FastMath.Distance(PlayerAircraft.GlobalPosition(), Warning.UnitCalled.GlobalPosition()) / 1000;
+                string EndInstruction;
+                if (Warning.UnitCalled.definition.typeIdentity.radar >= 0.5)
+                {
+                    float RelBearing = BearingAudConfig.GetRelativeBearing(PlayerAircraft, Warning.UnitCalled.GlobalPosition());
+                    if (CheckIfAtValue(90, 10, RelBearing) || CheckIfAtValue(270, 10, RelBearing) || Distance < 2)
+                    {
+                        EndInstruction = "Jammer";
+                    }
+                    else
+                    {
+                        EndInstruction = "Notch";
+                    }
+                }
+                else
+                {
+                    if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
+                    {
+                        EndInstruction = "Flare";
+                    }
+                    else
+                    {
+                        EndInstruction = "Decrease Throttle";
+                    }
+                }
+                EndInstruction = CFG_InstructionHazards.Get(EndInstruction).Value;
+                Warning.audioNames.Add(EndInstruction);
+            }
+            
+     
+        }
+        private bool CheckIfAtValue(float Targetvalue, float Uncertainty, float QueryValue) => (QueryValue > Targetvalue - Uncertainty & QueryValue < Targetvalue + Uncertainty);
+            
+        public static bool CheckIfMissileLocked(Unit unit, Aircraft PlayerAircraft)
+        {
+            if (unit.definition.typeIdentity.missile >= 0.5) {
+
+                if (((Missile)unit).targetID == PlayerAircraft.persistentID)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }       
+            
+        
     }
 
     internal class VWSWarning//technically should be a struct but i dont want values to be copied
 
     {
         public static BearingAudConfig BearingConfig;
+        public static InstructionHazard InstructionHazardConfig;
+        public static HostileHazardConfig HostileHazardsConfig;
 
-        public string[] audioNames;
+        public List<string> audioNames;
         public double Priority;
         public bool Played;
         public int UpdatesSinceBumped;
@@ -610,8 +741,15 @@ public class Plugin : BaseUnityPlugin
         public Unit UnitCalled;
 
         public bool IsInstruction;
+        public bool IsLocked;
 
-        public VWSWarning(int Priority, string[] AudioNames, Unit Unit, double Distance, bool IsInstruction = false)
+        public static void SetAdditionalFields(BearingAudConfig bearingAudConfig, InstructionHazard instructionHazard, HostileHazardConfig hostileHazardConfig)
+        {
+            BearingConfig = bearingAudConfig;
+            InstructionHazardConfig = instructionHazard;
+            HostileHazardsConfig = hostileHazardConfig;
+        }
+        public VWSWarning(int Priority, List<string> AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
         {
             this.audioNames = AudioNames;
             this.Priority = Priority;
@@ -620,6 +758,31 @@ public class Plugin : BaseUnityPlugin
             this.IsInstruction = IsInstruction;
             UpdatesSinceBumped = 0;
             UnitCalled = Unit;
+            this.IsLocked = IsLocked;
+        }
+        public VWSWarning(int Priority, string[] AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
+        {
+            this.audioNames = AudioNames.ToList();
+            this.Priority = Priority;
+            this.Priority = DistanceInclusivePriority(Distance);
+            Played = false;
+            this.IsInstruction = IsInstruction;
+            UpdatesSinceBumped = 0;
+            UnitCalled = Unit;
+            this.IsLocked = IsLocked;
+        }
+        public VWSWarning(int Priority, string AudioName, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
+        {
+
+            this.audioNames = new List<string>();
+            this.audioNames.Add(AudioName);
+            this.Priority = Priority;
+            this.Priority = DistanceInclusivePriority(Distance);
+            Played = false;
+            this.IsInstruction = IsInstruction;
+            UpdatesSinceBumped = 0;
+            UnitCalled = Unit;
+            this.IsLocked = IsLocked;
         }
         private double DistanceInclusivePriority(double Distance)
         {
@@ -632,14 +795,29 @@ public class Plugin : BaseUnityPlugin
         public void Bump(Aircraft Player, bool RenewBearing = true)
         {
             UpdatesSinceBumped = 0;
+
+            if(UnitCalled.definition.typeIdentity.missile >= 0.5)
+            {
+                if (InstructionHazard.CheckIfMissileLocked(UnitCalled, Player))
+                {
+                    Priority = HostileHazardsConfig.GetLockedMissilePriority();
+                }
+                else
+                {
+                    Priority = HostileHazardsConfig.GetMissilePriority();
+                }
+            }
+
             Priority = DistanceInclusivePriority(FastMath.Distance(Player.GlobalPosition(), UnitCalled.GlobalPosition()));
 
             if (RenewBearing)
             {
+                string tmp = audioNames[0];
+                audioNames = BearingConfig.GetPositionAudioString(Player, UnitCalled.GlobalPosition()).ToList();
+                audioNames.Insert(0, tmp);
 
-                string[] tmp = BearingConfig.GetPositionAudioString(Player, UnitCalled.GlobalPosition());
-                audioNames = PrependArray(audioNames[0], tmp);
-
+                VWSWarning Warning = this;
+                InstructionHazardConfig.AppendMissileWarning(ref Warning, Player);
             }
 
         }
@@ -691,7 +869,7 @@ public class Plugin : BaseUnityPlugin
         }
         public static bool CheckIfSameContents(VWSWarning Msg1, VWSWarning Msg2)
         {
-            if (Msg1.audioNames.Length != Msg2.audioNames.Length)
+            if (Msg1.audioNames.Count != Msg2.audioNames.Count)
             {
                 return false;
             }
@@ -699,7 +877,7 @@ public class Plugin : BaseUnityPlugin
             {
                 return false;
             }
-            for (int i = 0; i < Msg1.audioNames.Length; i++)
+            for (int i = 0; i < Msg1.audioNames.Count; i++)
             {
                 if (Msg1.audioNames[i] != Msg2.audioNames[i])
                 {
@@ -869,28 +1047,17 @@ public class Plugin : BaseUnityPlugin
                 return false;
             }
         }
-        //I know these are default functions but they dont work for some reason?
-        //I do not know why.
-        //And yes, I know its poor programming to have to append arrays
-        public static string[] PrependArray(string Value, string[] Array)
+
+        public bool CheckIfNoAudioInWarning()
         {
-            string[] ReturnArray = new string[Array.Length + 1];
-            ReturnArray[0] = Value;
-            for(int i = 0; i < Array.Length; i++)
+            foreach(string s in audioNames)
             {
-                ReturnArray[i + 1] = Array[i];
+                if(s != AudioHandler.NoAudio)
+                {
+                    return false;
+                }
             }
-            return ReturnArray;
-        }
-        public static string[] AppendArray(string Value, string[] Array)
-        {
-            string[] ReturnArray = new string[Array.Length + 1];
-            ReturnArray[Array.Length] = Value;
-            for (int i = 0; i < Array.Length; i++)
-            {
-                ReturnArray[i] = Array[i];
-            }
-            return ReturnArray;
+            return true;
         }
     }
     #endregion
@@ -918,6 +1085,7 @@ public class Plugin : BaseUnityPlugin
     ConfigEntry<float> CFG_MinAirThreat;
     ConfigEntry<bool> CFG_AlwaysCallOutAircraft;
     ConfigEntry<bool> CFG_OnlyCallOutLockedAirMissiles;
+    ConfigEntry<bool> CFG_OnlyCallOutIfInLineOfSight;
 
     //AudioStorage
     BearingAudConfig CFG_PositionCalloutAudio;
@@ -947,7 +1115,7 @@ public class Plugin : BaseUnityPlugin
         CFG_MinAirThreat = Config.Bind("VWS General", "Minimun threat posed by unit", 0.5f, new ConfigDescription("Minimun threat a unit must pose to the aircraft for it to be considered by the VWS", new AcceptableValueRange<float>(0, 1)));
         CFG_AlwaysCallOutAircraft = Config.Bind("VWS General", "Ignore Aircraft Capability", false, "If checked, all nearby enemy aircraft will be called out regardless of if their A2A capability");
         CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", false, "If checked, Only locked missiles will be called out");
-
+        CFG_OnlyCallOutIfInLineOfSight = Config.Bind("VWS General", "Only Call Out If In Line Of Sight", true, "If Checked, Only hazards that are in line of sight of the aircraft will be called out");
         string Root = Path.GetDirectoryName(Info.Location);
         DeletePluginDllOnClose = VerifyFileStructure(ref Root);
 
@@ -973,7 +1141,7 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
         Logger.LogInfo("Initialising List Of Warnings");
-        VWSWarning.BearingConfig = CFG_PositionCalloutAudio;
+        VWSWarning.SetAdditionalFields(CFG_PositionCalloutAudio, CFG_InstructionHazardAudio, CFG_HostilehazardsAudio);
         VWSList = new List<VWSWarning>();
         
 
@@ -1082,7 +1250,7 @@ public class Plugin : BaseUnityPlugin
             VWSList[index].IncrementBump();
             VWSList[index].CreateLogDump();
             Logger.LogInfo("SECOND");
-            if (VWSList[index].UpdatesSinceBumped > 2 || VWSList[index].UnitCalled.Identity.NetId == 0)
+            if (VWSList[index].UpdatesSinceBumped > 1 || VWSList[index].UnitCalled.Identity.NetId == 0 || VWSList[index].CheckIfNoAudioInWarning())
             {
                 Logger.LogInfo("REMOVING");
                 VWSList.RemoveAt(index);
@@ -1173,13 +1341,13 @@ public class Plugin : BaseUnityPlugin
                     if (!IsPresent) 
                     { 
                         Logger.LogInfo("BEARING AUDIO");
-                        string[] AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition);
+                        List<string> AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition).ToList();
                         foreach (string s in AudioNames)
                         {
                             Logger.LogInfo(s);
                         }
                         Logger.LogInfo("HAZARD AUDIO: " + HazardAudio);
-                        AudioNames = VWSWarning.PrependArray(HazardAudio, AudioNames);
+                        AudioNames.Insert(0, HazardAudio);
                         Logger.LogInfo("SCRIPT");
                         foreach(string s in AudioNames)
                         {
@@ -1188,6 +1356,7 @@ public class Plugin : BaseUnityPlugin
 
                         Logger.LogInfo("FINAL WARNING");
                         VWSWarning Warning = new VWSWarning(Priority, AudioNames, unit, Distance);
+                        CFG_InstructionHazardAudio.AppendMissileWarning(ref Warning, PlayerAircraft);
                         VWSWarning.AddWarning(ref VWSList, Warning);
                         Logger.LogInfo("Done :)");
                     }
@@ -1241,7 +1410,7 @@ public class Plugin : BaseUnityPlugin
         bool IsGround;
         bool IsMissile = unit.definition.typeIdentity.missile >= 0.5;
 
-        if (CFG_OnlyCallOutLockedAirMissiles.Value)
+        if (CFG_OnlyCallOutIfInLineOfSight.Value & !unit.LineOfSight(PlayerAircraft.GlobalPosition().AsVector3(), 10000f))
         {
             return false;
         }
@@ -1271,6 +1440,12 @@ public class Plugin : BaseUnityPlugin
                     AAthreat = 0.6f;//I justify this by saying that the CRAM is very similar to the SPAAG. NO said that CRAM poses no risk to aircraft. this is wrong imo.
                     //Ill say that CRAM is slightly weaker than SPAAG (0.7) as NO seems to think it poses no airthreat
                 }
+
+                if(CFG_OnlyCallOutLockedAirMissiles.Value & unit.definition.typeIdentity.missile >= 0.5 & !InstructionHazard.CheckIfMissileLocked(unit,PlayerAircraft))
+                {
+                    return false;
+                }
+
                 return (AAthreat > CFG_MinAirThreat.Value);
             }
         }

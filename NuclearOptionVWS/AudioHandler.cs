@@ -353,6 +353,17 @@ namespace Lock_Shoot_Tone_Ping
         }
         public Queue<AudioClip> GetQueue() => AudioQueue;
         public int GetQueueLength() => AudioQueue.Count;
+        public bool CheckIfQueueContains(string AudioName)
+        {
+            foreach (AudioClip a in AudioQueue)
+            {
+                if (a.name == AudioName)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
         #endregion
 
         public void InjectAudioClips(AudioClip[] InjectedAudio)
