@@ -21,12 +21,13 @@ using UnityEngine.UI;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "Aeriicat-VWS", "1.0.0")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.0.0")]
 public class Plugin : BaseUnityPlugin
 {
     #region AudioStorage
     internal static class MiscData
     {
+        public const string PriorityDescriptionText = "(Higher number = Higher Priority). A priority of 0 will result in the audio not being played at all";
         public static int[] GetPriorityDropDownArray()
         {
             int[] PriorityDropDown = new int[10];
@@ -35,6 +36,17 @@ public class Plugin : BaseUnityPlugin
                 PriorityDropDown[i] = i;
             }
             return PriorityDropDown;
+        }
+        public static string GetAudioNameProtected(ConfigEntry<string> HazardCFG)
+        {
+            if (HazardCFG != null)
+            {
+                return HazardCFG.Value;
+            }
+            else
+            {
+                return AudioHandler.NoAudio;
+            }
         }
     }
     internal class BearingAudConfig
@@ -73,9 +85,9 @@ public class Plugin : BaseUnityPlugin
         private int GetLowerBearing(int i) => (i * 90 - 45 + 360) % 360;
         private int GetIndex(int Bearing) => ((Bearing + 45) / 90) % 4;
 
-        public string[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition)
+        public ConfigEntry<string>[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition)
         {
-            string[] ReturnString;
+            ConfigEntry<string>[] ReturnString;
             //GlobalPosition PlayerPosition = Player.GlobalPosition();
             //float dx = PlayerPosition.x - EnemyPosition.x;
             //float dy = PlayerPosition.y - EnemyPosition.y;
@@ -96,22 +108,22 @@ public class Plugin : BaseUnityPlugin
             Logger.LogInfo("ANGLE: "+ChordAngleDeviation);
             if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
             {
-                ReturnString = new string[2];
+                ReturnString = new ConfigEntry<string>[2];
                 if(ChordAngleDeviation > 0)
                 {
-                    ReturnString[1] = High.Value;
+                    ReturnString[1] = High;
                 }
                 else
                 {
-                    ReturnString[1] = Low.Value;
+                    ReturnString[1] = Low;
                 }
             }
             else
             {
-                ReturnString = new string[1];
+                ReturnString = new ConfigEntry<string>[1];
             }
 
-            ReturnString[0] = Bearings[GetIndex((int)Math.Round(RelativeBearing))].Value;
+            ReturnString[0] = Bearings[GetIndex((int)Math.Round(RelativeBearing))];
 
             return ReturnString;
             
@@ -206,7 +218,7 @@ public class Plugin : BaseUnityPlugin
                     new ConfigDescription("What sound do you want to be played to alert you of a " + HazardNames[i] + " threat.", new AcceptableValueList<string>(ArrayOfAllAudio)));
 
                 Priority[i] = plugin.Config.Bind(Category, HazardNames[i] + " Priority", DefaultHazardPriority[i],
-                    new ConfigDescription("What priority do you want to assign "+HazardNames[i]+" hazards (Higher number = Higher Priority)", new AcceptableValueList<int>(PriorityDropDown)));
+                    new ConfigDescription("What priority do you want to assign "+HazardNames[i]+" hazards "+MiscData.PriorityDescriptionText, new AcceptableValueList<int>(PriorityDropDown)));
 
                 if (HazardNames[i] == "Missile")
                 {
@@ -217,7 +229,7 @@ public class Plugin : BaseUnityPlugin
                     }
 
                     Priority[HazardNames.Length] = plugin.Config.Bind(Category, "Missile Locked Priority", LockedPriority,
-                        new ConfigDescription("What priority do you want to assign Locked Missile hazards (Higher number = Higher Priority)", new AcceptableValueList<int>(PriorityDropDown)));
+                        new ConfigDescription("What priority do you want to assign Locked Missile hazards "+MiscData.PriorityDescriptionText, new AcceptableValueList<int>(PriorityDropDown)));
                 }
             }
         }
@@ -234,37 +246,27 @@ public class Plugin : BaseUnityPlugin
             HazardPriority = 0;
             return null;
         }
-        private string GetAudioNameProtected(ConfigEntry<string> HazardCFG)
-        {
-            if(HazardCFG != null)
-            {
-                return HazardCFG.Value;
-            }
-            else
-            {
-                return AudioHandler.NoAudio;
-            }
-        }
         public int GetLockedMissilePriority() => Priority[Priority.Length - 1].Value;
         public int GetMissilePriority() => Priority[Priority.Length - 2].Value;
-        public string GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority,bool Locked = false,float AAThreatOverride = -1)
+        public ConfigEntry<string> GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority,bool Locked = false,float AAThreatOverride = -1)
         {
+            ConfigEntry<string> ReturnConfig;
             if (unit.definition.typeIdentity.missile >= 0.5)
             {
                 if (Locked)
                 {
                     HazardPriority = GetLockedMissilePriority();
                     int tmp;
-                    return GetAudioNameProtected(GetHazardCFG("Missile", out tmp));
+                    ReturnConfig = GetHazardCFG("Missile", out tmp);
                 }
                 else
                 {
-                    return GetAudioNameProtected(GetHazardCFG("Missile", out HazardPriority));
+                    ReturnConfig = GetHazardCFG("Missile", out HazardPriority);
                 }
             }
             else if (unit.definition.typeIdentity.air >= 0.5)
             {
-                return GetAudioNameProtected(GetHazardCFG("Air", out HazardPriority));
+                ReturnConfig = GetHazardCFG("Air", out HazardPriority);
             }
             else
             {
@@ -276,7 +278,7 @@ public class Plugin : BaseUnityPlugin
                         if (tmpRegex.Match(unit.definition.code).Success)
                         {
                             HazardPriority = Priority[i].Value;
-                            return HostileHazards[i].Value;
+                            return HostileHazards[i];
                         }
                     }
                 }
@@ -294,13 +296,19 @@ public class Plugin : BaseUnityPlugin
 
                 if(AAThreat >= MinAirThreat.Value + (1 - MinAirThreat.Value) / 2)
                 {
-                    return GetAudioNameProtected(GetHazardCFG("High Priotiy Misc Ground", out HazardPriority));
+                    ReturnConfig = GetHazardCFG("High Priotiy Misc Ground", out HazardPriority);
                 }
                 else
                 {
-                    return GetAudioNameProtected(GetHazardCFG("Low Priority Misc Ground", out HazardPriority));
+                    ReturnConfig = GetHazardCFG("Low Priority Misc Ground", out HazardPriority);
                 }
             }
+
+            if(ReturnConfig.Value == AudioHandler.NoAudio)
+            {
+                HazardPriority = 0;
+            }
+            return ReturnConfig;
         }
         public void AddToCFGDictionary(ref ExternalPackHandler EPH)
         {
@@ -398,7 +406,7 @@ public class Plugin : BaseUnityPlugin
             plugin.Log(LogLevel.Info, "ALT");
             CFG_DangerousAltitude = plugin.Config.Bind(HazardSettings, "dangerous Altitude", 10, "If your relative altitude [m] is below this number, the dangerous altitude audio will be played");
             plugin.Log(LogLevel.Info, "PRIOR");
-            CFG_InstructionHazardPriority = plugin.Config.Bind(HazardSettings, "Instruction hazard Priority", 7, new ConfigDescription("What priority do you want to assign instruction hazards (Higher number = Higher Priority)",new AcceptableValueList<int>(MiscData.GetPriorityDropDownArray())));
+            CFG_InstructionHazardPriority = plugin.Config.Bind(HazardSettings, "Instruction hazard Priority", 7, new ConfigDescription("What priority do you want to assign instruction hazards "+MiscData.PriorityDescriptionText,new AcceptableValueList<int>(MiscData.GetPriorityDropDownArray())));
             plugin.Log(LogLevel.Info, "GeForce");
             CFG_GForceTolerance = plugin.Config.Bind(HazardSettings, "GeForce Tolerance", 8f, new ConfigDescription("How many Gs do you want to be pulled before an overG warning is issued", new AcceptableValueRange<float>(2, 10)));
             plugin.Log(LogLevel.Info,"Dictionary");
@@ -434,16 +442,16 @@ public class Plugin : BaseUnityPlugin
 
             if (VerticalVel*-1*CFG_SecondsToCollision.Value*2 > Alt & !PlayerAircraft.gearDeployed)
             {
-                string[] AltitudeWarningLine = new string[2];
+                ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
                 if(VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
                 {
                     FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude").Value;
+                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
                 }
                 else
                 {
                     FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude").Value;
+                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
                 }
 
 
@@ -451,16 +459,16 @@ public class Plugin : BaseUnityPlugin
                 {
                     if(BankAngle < 0)
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left").Value;
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
                     }
                     else
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right").Value;
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
                     }
                 }
                 else
                 {
-                    AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up").Value;
+                    AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
                 }
 
                 VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, AltitudeWarningLine, PlayerAircraft, 0, true)), PlayerAircraft);
@@ -485,7 +493,7 @@ public class Plugin : BaseUnityPlugin
             //OverG
             if(Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
             {
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, CFG_InstructionHazards.Get("OverG").Value, PlayerAircraft, 0, true)), PlayerAircraft);
+                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, CFG_InstructionHazards.Get("OverG"), PlayerAircraft, 0, true)), PlayerAircraft);
             }
 
             //Flares
@@ -679,7 +687,7 @@ public class Plugin : BaseUnityPlugin
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold*0.85f)
             {
 
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(CFG_InstructionHazardPriority.Value, CFG_InstructionHazards.Get("AoA").Value, Aircraft, 0, true)), Aircraft);
+                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(CFG_InstructionHazardPriority.Value, CFG_InstructionHazards.Get("AoA"), Aircraft, 0, true)), Aircraft);
                 if (num > StallHornThreshold)
                 {
                     FatalAoA = true;
@@ -721,8 +729,7 @@ public class Plugin : BaseUnityPlugin
                         EndInstruction = "Decrease Throttle";
                     }
                 }
-                EndInstruction = CFG_InstructionHazards.Get(EndInstruction).Value;
-                Warning.audioNames.Add(EndInstruction);
+                Warning.audioNames.Add(CFG_InstructionHazards.Get(EndInstruction));
             }
             
      
@@ -758,10 +765,12 @@ public class Plugin : BaseUnityPlugin
         public static InstructionHazard InstructionHazardConfig;
         public static HostileHazardConfig HostileHazardsConfig;
 
-        public List<string> audioNames;
+        public List<ConfigEntry<string>> audioNames;
         public double Priority;
         public bool Played;
         public int UpdatesSinceBumped;
+
+        public float TimeOfLastPlayed;
 
         public Unit UnitCalled;
 
@@ -774,7 +783,7 @@ public class Plugin : BaseUnityPlugin
             InstructionHazardConfig = instructionHazard;
             HostileHazardsConfig = hostileHazardConfig;
         }
-        public VWSWarning(int Priority, List<string> AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
+        public VWSWarning(int Priority, List<ConfigEntry<string>> AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
         {
             this.audioNames = AudioNames;
             this.Priority = Priority;
@@ -784,8 +793,9 @@ public class Plugin : BaseUnityPlugin
             UpdatesSinceBumped = 0;
             UnitCalled = Unit;
             this.IsLocked = IsLocked;
+            TimeOfLastPlayed = 0;
         }
-        public VWSWarning(int Priority, string[] AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
+        public VWSWarning(int Priority, ConfigEntry<string>[] AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
         {
             this.audioNames = AudioNames.ToList();
             this.Priority = Priority;
@@ -795,11 +805,12 @@ public class Plugin : BaseUnityPlugin
             UpdatesSinceBumped = 0;
             UnitCalled = Unit;
             this.IsLocked = IsLocked;
+            TimeOfLastPlayed = 0;
         }
-        public VWSWarning(int Priority, string AudioName, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
+        public VWSWarning(int Priority, ConfigEntry<string> AudioName, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
         {
 
-            this.audioNames = new List<string>();
+            this.audioNames = new List<ConfigEntry<string>>();
             this.audioNames.Add(AudioName);
             this.Priority = Priority;
             this.Priority = DistanceInclusivePriority(Distance);
@@ -808,6 +819,7 @@ public class Plugin : BaseUnityPlugin
             UpdatesSinceBumped = 0;
             UnitCalled = Unit;
             this.IsLocked = IsLocked;
+            TimeOfLastPlayed = 0;
         }
         private double DistanceInclusivePriority(double Distance)
         {
@@ -837,7 +849,7 @@ public class Plugin : BaseUnityPlugin
 
             if (RenewBearing)
             {
-                string tmp = audioNames[0];
+                ConfigEntry<string> tmp = audioNames[0];
                 audioNames = BearingConfig.GetPositionAudioString(Player, UnitCalled.GlobalPosition()).ToList();
                 audioNames.Insert(0, tmp);
 
@@ -879,9 +891,9 @@ public class Plugin : BaseUnityPlugin
         public void CreateLogDump()
         {
             string LogLineOne = "VWS: [" + UnitCalled.Identity + "]| ";
-            foreach(string s in audioNames)
+            foreach(ConfigEntry<string> s in audioNames)
             {
-                LogLineOne += s + "; ";
+                LogLineOne += s.Value + "; ";
             }
             Plugin.I.Log(LogLevel.Info, LogLineOne);
             Plugin.I.Log(LogLevel.Info, "PR: " + Priority + " TimeSinceBumped: " + UpdatesSinceBumped + " Played:" + Played);
@@ -1003,6 +1015,7 @@ public class Plugin : BaseUnityPlugin
 
             }
             index = lower;
+            Logger.LogInfo("Index:"+index);
             if (Math.Floor(WarningList[index].Priority) < PrioritySection)
             {
                 index++;
@@ -1075,9 +1088,9 @@ public class Plugin : BaseUnityPlugin
 
         public bool CheckIfNoAudioInWarning()
         {
-            foreach(string s in audioNames)
+            foreach(ConfigEntry<string> s in audioNames)
             {
-                if(s != AudioHandler.NoAudio)
+                if(s.Value != AudioHandler.NoAudio)
                 {
                     return false;
                 }
@@ -1086,7 +1099,8 @@ public class Plugin : BaseUnityPlugin
         }
     }
     #endregion
-    private const string FileModName = "Aeriicat-VWS";
+    #region MainPlugin
+    private const string FileModName = "NuclearOption-VWS";
     bool DeletePluginDllOnClose = false;
     public static Plugin I { get; private set; }
     internal static new ManualLogSource Logger;
@@ -1111,6 +1125,7 @@ public class Plugin : BaseUnityPlugin
     ConfigEntry<bool> CFG_AlwaysCallOutAircraft;
     ConfigEntry<bool> CFG_OnlyCallOutLockedAirMissiles;
     ConfigEntry<bool> CFG_OnlyCallOutIfInLineOfSight;
+    //ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
 
     //AudioStorage
     BearingAudConfig CFG_PositionCalloutAudio;
@@ -1134,13 +1149,16 @@ public class Plugin : BaseUnityPlugin
 
 
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 100)));
+        //CFG_MinimunDelayBetweenWarnings = Config.Bind("General", "MinimunDelayBeforeWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
 
-        CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 10f,new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
+        CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 15f,new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MaxConsiderationDistanceGROUND = Config.Bind("VWS General", "Max Distance to analyse Ground units (Km)", 10f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MinAirThreat = Config.Bind("VWS General", "Minimun threat posed by unit", 0.5f, new ConfigDescription("Minimun threat a unit must pose to the aircraft for it to be considered by the VWS", new AcceptableValueRange<float>(0, 1)));
         CFG_AlwaysCallOutAircraft = Config.Bind("VWS General", "Ignore Aircraft Capability", false, "If checked, all nearby enemy aircraft will be called out regardless of if their A2A capability");
-        CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", false, "If checked, Only locked missiles will be called out");
+        CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", true, "If checked, Only locked missiles will be called out");
         CFG_OnlyCallOutIfInLineOfSight = Config.Bind("VWS General", "Only Call Out If In Line Of Sight", true, "If Checked, Only hazards that are in line of sight of the aircraft will be called out");
+
+
         string Root = Path.GetDirectoryName(Info.Location);
         DeletePluginDllOnClose = VerifyFileStructure(ref Root);
 
@@ -1295,7 +1313,7 @@ public class Plugin : BaseUnityPlugin
             VWSList[index].IncrementBump();
             VWSList[index].CreateLogDump();
             Logger.LogInfo("SECOND");
-            if (VWSList[index].UpdatesSinceBumped > 1 || VWSList[index].UnitCalled.Identity.NetId == 0 || VWSList[index].CheckIfNoAudioInWarning())
+            if (VWSList[index].UpdatesSinceBumped > 1 || VWSList[index].UnitCalled.Identity.NetId == 0 || VWSList[index].CheckIfNoAudioInWarning() || Math.Floor(VWSList[index].Priority) == 0)
             {
                 Logger.LogInfo("REMOVING");
                 VWSList.RemoveAt(index);
@@ -1318,20 +1336,24 @@ public class Plugin : BaseUnityPlugin
         
         
     }
-    private void ReadOffHighestPriorities()
+    private void ReadOffHighestPriorities(int HighestPriorityTierOverride = int.MinValue)
     {
         int index = VWSList.Count - 1;
         int HighestPriorityTier = (int)Math.Floor(VWSList[index].Priority);
+
+        if (HighestPriorityTierOverride >= 0)
+        {
+            HighestPriorityTier = HighestPriorityTierOverride;
+        }
+        
+
+
         Logger.LogInfo("HIGHEST PRIORITY: " + HighestPriorityTier);
-        while (Math.Floor(VWSList[index].Priority) == HighestPriorityTier & VWSList[index].Played)
+        while (Math.Floor(VWSList[index].Priority) == HighestPriorityTier & VWSList[index].Played /*& (Time.timeSinceLevelLoad - VWSList[index].TimeOfLastPlayed) < CFG_MinimunDelayBetweenWarnings.Value*/)
         {
             index--;
-            if (index < 0)
+            if(index < 0)
             {
-                for (int i = 0; i < VWSList.Count; i++)
-                {
-                    VWSList[i].Played = false;
-                }
                 return;
             }
         }
@@ -1339,13 +1361,28 @@ public class Plugin : BaseUnityPlugin
         VWSWarning WarningToBePlayed = VWSList[index];
         if (Math.Floor(WarningToBePlayed.Priority) < HighestPriorityTier)
         {
+            //if (index != VWSList.Count - 1) 
+            //{
+            //    if (Time.timeSinceLevelLoad - VWSList[index+1].TimeOfLastPlayed < CFG_MinimunDelayBetweenWarnings.Value)
+            //    {
+            //        ReadOffHighestPriorities(HighestPriorityTier - 1);
+            //        return;
+            //    }
+            //}
+
+            for (int i = 0; i < VWSList.Count; i++)
+            {
+                VWSList[i].Played = false;
+            }
+            ReadOffHighestPriorities();
             return;
         }
         Logger.LogInfo("CURR PRIOR: "+WarningToBePlayed.Priority);
         WarningToBePlayed.Played = true;
-        foreach (string s in WarningToBePlayed.audioNames)
+        WarningToBePlayed.TimeOfLastPlayed = Time.timeSinceLevelLoad;
+        foreach (ConfigEntry<string> s in WarningToBePlayed.audioNames)
         {
-            Audio.AddToQueue(s);
+            Audio.AddToQueue(MiscData.GetAudioNameProtected(s));
         }
 
 
@@ -1356,10 +1393,17 @@ public class Plugin : BaseUnityPlugin
         //Logger.LogInfo(NullPosition);
         try
         {
+            
+
             if (((PlayerHQ != null & PlayerHQ != unit.NetworkHQ & unit.NetworkHQ != null)
                 ||IsLocked) 
                 & !NullPosition)//If Enemy (or is locked onto you)
             {
+                if (!IsLocked)
+                {
+                    IsLocked = InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft);
+                }
+
                 GlobalPosition EnemyPosition = unit.GlobalPosition();
                 GlobalPosition PlayerPosition = PlayerAircraft.GlobalPosition();
                 double Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
@@ -1373,7 +1417,7 @@ public class Plugin : BaseUnityPlugin
 
                     int Priority;
                     Logger.LogInfo("HAZARD AUDIO");
-                    string HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority, IsLocked);
+                    ConfigEntry<string> HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority, IsLocked);
 
 
                     if (IsLocked)
@@ -1386,17 +1430,17 @@ public class Plugin : BaseUnityPlugin
                     if (!IsPresent) 
                     { 
                         Logger.LogInfo("BEARING AUDIO");
-                        List<string> AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition).ToList();
-                        foreach (string s in AudioNames)
+                        List<ConfigEntry<string>> AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition).ToList();
+                        foreach (ConfigEntry<string> s in AudioNames)
                         {
                             Logger.LogInfo(s);
                         }
                         Logger.LogInfo("HAZARD AUDIO: " + HazardAudio);
                         AudioNames.Insert(0, HazardAudio);
                         Logger.LogInfo("SCRIPT");
-                        foreach(string s in AudioNames)
+                        foreach(ConfigEntry<string> s in AudioNames)
                         {
-                            Logger.LogInfo(s);
+                            Logger.LogInfo(s.Value);
                         }
 
                         Logger.LogInfo("FINAL WARNING");
@@ -1531,6 +1575,6 @@ public class Plugin : BaseUnityPlugin
             }
         }
     }
-    
-    
+    #endregion
+
 }
