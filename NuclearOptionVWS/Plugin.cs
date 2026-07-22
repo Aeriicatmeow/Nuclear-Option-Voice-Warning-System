@@ -146,6 +146,15 @@ public class Plugin : BaseUnityPlugin
             float Angle = Vector3.Angle(up, Difference);
             return (Angle-90)*-1;//this converts it to the format accepted by the mod
         }
+        public void AddToCFGDictionary(ref ExternalPackHandler EPH)
+        {
+            foreach (ConfigEntry<string> c in Bearings)
+            {
+                EPH.AddToDictionary(c);
+            }
+            EPH.AddToDictionary(Low);
+            EPH.AddToDictionary(High);
+        }
     }
     internal class HostileHazardConfig
     {
@@ -293,6 +302,13 @@ public class Plugin : BaseUnityPlugin
                 }
             }
         }
+        public void AddToCFGDictionary(ref ExternalPackHandler EPH)
+        {
+            foreach (ConfigEntry<string> c in HostileHazards)
+            {
+                EPH.AddToDictionary(c);
+            }
+        }
     }
     internal class InstructionHazard
     {
@@ -402,6 +418,7 @@ public class Plugin : BaseUnityPlugin
             }
             return Angle;
         }
+
         private bool DangerCloseFired = true;
         private bool FlaresLowFired = true;
         private bool CapacitorLowFired = true;
@@ -508,6 +525,7 @@ public class Plugin : BaseUnityPlugin
                 }
             }
         }
+
         private bool FatalAoA = false;
         private bool FatalTrajectory = false;
         Queue<PilotHealthSnapshot> PilotHealthTrend;
@@ -723,7 +741,14 @@ public class Plugin : BaseUnityPlugin
             return false;
         }       
             
-        
+        public void AddToCFGDictionary(ref ExternalPackHandler EPH)
+        {
+            foreach(ConfigEntry<string> c in CFG_InstructionHazards.Values)
+            {
+                EPH.AddToDictionary(c);
+            }
+            EPH.AddToDictionary(CFG_AudioOut);
+        }
     }
 
     internal class VWSWarning//technically should be a struct but i dont want values to be copied
@@ -1143,8 +1168,20 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Initialising List Of Warnings");
         VWSWarning.SetAdditionalFields(CFG_PositionCalloutAudio, CFG_InstructionHazardAudio, CFG_HostilehazardsAudio);
         VWSList = new List<VWSWarning>();
-        
 
+        Logger.LogInfo("Generating CFG Dictionary");
+        try
+        {
+            CFG_PositionCalloutAudio.AddToCFGDictionary(ref PackHandler);
+            CFG_InstructionHazardAudio.AddToCFGDictionary(ref PackHandler);
+            CFG_HostilehazardsAudio.AddToCFGDictionary(ref PackHandler);
+        }
+        catch(Exception EXP)
+        {
+            Logger.LogFatal(EXP);
+        }
+
+        Logger.LogInfo("Initialising HarmonyX");
         Inj_Harmony = new Harmony($"com.Aeriicatmeow.{FileModName}");
         Inj_Harmony.PatchAll();
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
@@ -1192,12 +1229,20 @@ public class Plugin : BaseUnityPlugin
         }
         else
         {
-
+            PackHandler.SaveCurrentSelectedConfig();
         }
     }
     private void Update()
     {
-        
+        try
+        {
+            PackHandler.UpdateActivePack();
+        }
+        catch(Exception EXP)
+        {
+            Logger.LogFatal(EXP);
+        }
+
         if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null)
         {
             NullPosition = false;
@@ -1474,14 +1519,18 @@ public class Plugin : BaseUnityPlugin
     }
     public void TriggerAoACheck(float StallHornThreshold, float VelocityThreshold)
     {
-        try
+        if (!NullPosition)
         {
-            CFG_InstructionHazardAudio.CheckAoAWarning(PlayerAircraft, StallHornThreshold, VelocityThreshold, ref VWSList);
-        }
-        catch (Exception EXP)
-        {
-            Logger.LogFatal(EXP);
+            try
+            {
+                CFG_InstructionHazardAudio.CheckAoAWarning(PlayerAircraft, StallHornThreshold, VelocityThreshold, ref VWSList);
+            }
+            catch (Exception EXP)
+            {
+                Logger.LogFatal(EXP);
+            }
         }
     }
+    
     
 }

@@ -11,6 +11,7 @@ using NuclearOptionVWS;
 using BepInEx.Configuration;
 using System.Linq;
 using Unity.Audio;
+using System.Collections;
 
 namespace Lock_Shoot_Tone_Ping
 {
@@ -22,17 +23,25 @@ namespace Lock_Shoot_Tone_Ping
         private string DefaultPath;
 
         private Plugin MainPlugin;
+
         private ConfigEntry<string> CFG_EncodingType;
+        private ConfigEntry<string> CFG_SelectedPack;
+        private ConfigEntry<bool> CFG_WipeEmptyConfigs;
         private string CurrentPack;
 
         private List<PackAudioHandler> AudioHandlersForDifferentPacks;
         public AudioHandler GeneralAudioHandler;
 
+        public Dictionary<string, ConfigEntryBase> DictionaryOfAllSaveableConfigs;
+
         public ExternalPackHandler(string Root, GameObject Host, ConfigEntry<int> Volume, Plugin Plugin,out ConfigEntry<string> EncodingType, out AudioHandler GeneralAudioHandler)
         {
+            DictionaryOfAllSaveableConfigs = new Dictionary<string, ConfigEntryBase>();
+
             MainPlugin = Plugin;
             string[] EncodingTypes = { "Raw", "Streamlined", "Simplified" };
             EncodingType = MainPlugin.Config.Bind("External Packs", "PackConfigEncoding", "Streamlined", new ConfigDescription("What Pack Encoding Type do you want to save the current configs as (change will occur when you close the game or when you change active pack)", new AcceptableValueList<string>(EncodingTypes)));
+            CFG_WipeEmptyConfigs = MainPlugin.Config.Bind("External Packs", "Wipe undefined fields", false, "If selected, undefined values in a pack config will not wipe old config values");
             this.CFG_EncodingType = EncodingType;
 
             string FileModName = Plugin.I.GetFileModName();
@@ -75,6 +84,16 @@ namespace Lock_Shoot_Tone_Ping
             AudioHandlersForDifferentPacks.Insert(0, PackAudioHandler.GenerateDefaultStandin(this));
             Plugin.I.Log(LogLevel.Info, "Injecting Audio into AudioHandler");
             GeneralAudioHandler.InjectAudioClips(GenerateArrayAllAudioEver());
+            Plugin.I.Log(LogLevel.Info, "Generating Pack Selection Config");
+            string[] NameOfAllAudioPacks = GeneratePackNamesArray();
+            if (NameOfAllAudioPacks.Length > 0) 
+            {
+                CFG_SelectedPack = MainPlugin.Config.Bind("External Packs", "Selected Pack", DefaultNotated,new ConfigDescription("What Audio pack do you want to use?", new AcceptableValueList<string>(NameOfAllAudioPacks)));
+            }
+            else
+            {
+                CFG_SelectedPack = MainPlugin.Config.Bind("External Packs", "Selected Pack", DefaultNotated, "What Audio pack do you want to use? (None found)");
+            }
             Plugin.I.Log(LogLevel.Info, "External Pack Handler Generated");
         }
        
@@ -146,39 +165,39 @@ namespace Lock_Shoot_Tone_Ping
         }
 
         #region from LSTP main plugin class
-        private void WriteConfigsToExternalFile(string Path, Dictionary<string,ConfigEntryBase> BigConfigDictionary)
+        private void WriteConfigsToExternalFile(string Path, Dictionary<string,ConfigEntryBase> DictionaryOfAllSaveableConfigs)
         {
             //string text = "";
-            //foreach(string s in BigConfigDictionary.Keys)
+            //foreach(string s in DictionaryOfAllSaveableConfigs.Keys)
             //{
-            //    text += s + "#" + BigConfigDictionary[s].BoxedValue  +"\n";
+            //    text += s + "#" + DictionaryOfAllSaveableConfigs[s].BoxedValue  +"\n";
             //}
             //File.WriteAllText(Path, text);
             if (CFG_EncodingType.Value == "Streamlined")
             {
                 Plugin.I.Log(LogLevel.Info,"Writing StreamLined");
-                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(BigConfigDictionary), false));
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(DictionaryOfAllSaveableConfigs), false));
             }
             else if (CFG_EncodingType.Value == "Simplified")
             {
                 Plugin.I.Log(LogLevel.Info,"Writing Simplified");
-                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(BigConfigDictionary), true));
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(DictionaryOfAllSaveableConfigs), true));
             }
             else
             {
                 Plugin.I.Log(LogLevel.Info,"Writing Raw");
 
-                File.WriteAllLines(Path, GetCurrentConfig(BigConfigDictionary));
+                File.WriteAllLines(Path, GetCurrentConfig(DictionaryOfAllSaveableConfigs));
             }
         }
-        private string[] GetCurrentConfig(Dictionary<string,ConfigEntryBase> BigConfigDictionary)
+        private string[] GetCurrentConfig(Dictionary<string,ConfigEntryBase> DictionaryOfAllSaveableConfigs)
         {
             Regex RevertPrefix = new Regex(@"^\[.+\] (.+)");
             int index = 0;
-            string[] CFG = new string[BigConfigDictionary.Count];
-            foreach (string s in BigConfigDictionary.Keys)
+            string[] CFG = new string[DictionaryOfAllSaveableConfigs.Count];
+            foreach (string s in DictionaryOfAllSaveableConfigs.Keys)
             {
-                object CurrentValue = BigConfigDictionary[s].BoxedValue;
+                object CurrentValue = DictionaryOfAllSaveableConfigs[s].BoxedValue;
                 if (CurrentValue.GetType() == typeof(string))
                 {
                     Match m = RevertPrefix.Match((string)CurrentValue);
@@ -309,6 +328,139 @@ namespace Lock_Shoot_Tone_Ping
                 }
 
             }
+
+        }
+        #endregion
+
+        #region Config Handling
+        public void AddToDictionary(ConfigEntryBase Config)
+        {
+            DictionaryOfAllSaveableConfigs.Add(Config.Definition.ToString(), Config);
+        }
+
+        private string[] GetCurrentConfig()
+        {
+            Regex RevertPrefix = new Regex(@"^\[.+\] (.+)");
+            int index = 0;
+            string[] CFG = new string[DictionaryOfAllSaveableConfigs.Count];
+            foreach (string s in DictionaryOfAllSaveableConfigs.Keys)
+            {
+                object CurrentValue = DictionaryOfAllSaveableConfigs[s].BoxedValue;
+                if (CurrentValue.GetType() == typeof(string))
+                {
+                    Match m = RevertPrefix.Match((string)CurrentValue);
+                    if (m.Success & CurrentPack != ExternalPackHandler.DefaultNotated)
+                    {
+                        CurrentValue = m.Groups[1].Value;
+                    }
+                }
+
+                CFG[index] = s + PackDataSplitChar + CurrentValue;
+
+                index++;
+            }
+            return CFG;
+        }
+        private void WriteConfigsToExternalFile(string Path)
+        {
+            //string text = "";
+            //foreach(string s in DictionaryOfAllSaveableConfigs.Keys)
+            //{
+            //    text += s + "#" + DictionaryOfAllSaveableConfigs[s].BoxedValue  +"\n";
+            //}
+            //File.WriteAllText(Path, text);
+            if (CFG_EncodingType.Value == "Streamlined")
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing StreamLined");
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(), false));
+            }
+            else if (CFG_EncodingType.Value == "Simplified")
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing Simplified");
+                File.WriteAllLines(Path, PackAudioHandler.ConvertToStreamLined(GetCurrentConfig(), true));
+            }
+            else
+            {
+                Plugin.I.Log(LogLevel.Info,"Writing Raw");
+
+                File.WriteAllLines(Path, GetCurrentConfig());
+            }
+        }
+
+        public void SaveConfig(PackAudioHandler CurrentPack)
+        {
+            CurrentPack.Configs = GetCurrentConfig();
+            try
+            {
+                WriteConfigsToExternalFile(CurrentPack.GetConfigPath());
+            }
+            catch (Exception EXP)
+            {
+                Plugin.I.Log(LogLevel.Fatal,EXP);
+            }
+
+        }
+        public void SaveCurrentSelectedConfig()
+        {
+            SaveConfig(GetPackAudioHandlerFromName(CFG_SelectedPack.Value));
+        }
+        public void UpdateActivePack(bool AlwaysWriteToDefault = false)
+        {
+            if (CurrentPack != CFG_SelectedPack.Value)
+            {
+                PackAudioHandler CurrentAudioPack = GetPackAudioHandlerFromName(CurrentPack);
+                if (!CurrentAudioPack.IsNull)
+                {
+                    Plugin.I.Log(LogLevel.Info, "Saving Current PackConfig");
+                    Plugin.I.Log(LogLevel.Info, "Writing to " + CurrentAudioPack.GetConfigPath());
+                    SaveConfig(CurrentAudioPack);
+
+
+                }
+                else
+                {
+                    Plugin.I.Log(LogLevel.Error, "Current Pack could not be saved .Pack is not defined. If this is triggered during mod load up, disregard.");
+                    //if (AlwaysWriteToDefault)
+                    //{
+                    //    Plugin.I.Log(LogLevel.Info, "In order to preserve current configs, searching for config again");
+                    //    WriteConfigsToExternalFile(PackHandler.GetPackAudioHandlerFromName(CFG_SelectedPack.Value).GetConfigPath());
+                    //}
+                }
+                Plugin.I.Log(LogLevel.Info, "Loading Pack" + CFG_SelectedPack.Value);
+                CurrentAudioPack = GetPackAudioHandlerFromName(CFG_SelectedPack.Value);
+                if (!CurrentAudioPack.IsNull)
+                {
+                    Plugin.I.Log(LogLevel.Info, "Loading " + CFG_SelectedPack.Value);
+                    try
+                    {
+                        CurrentPack = CFG_SelectedPack.Value;//This must go here to stop infitite recursion.
+
+                        //Audiohandler.clear queue
+
+
+                        LoadConfigsFromText(CurrentAudioPack, DictionaryOfAllSaveableConfigs, true, CFG_WipeEmptyConfigs.Value);
+                        Plugin.I.Log(LogLevel.Info, "Pack Loaded");
+
+                        //Plugin.I.Log(LogLevel.Info, "Reloading Mod (includes clearing config");
+
+
+                        //initialiseAllConfigsOnly();
+
+
+                    }
+                    catch (Exception EXP)
+                    {
+                        Plugin.I.Log(LogLevel.Fatal,EXP);
+                    }
+
+                }
+                else
+                {
+                    Plugin.I.Log(LogLevel.Error,"Could not Load Pack. Pack is not defined.");
+                }
+
+            }
+
         }
         #endregion
     }
@@ -661,5 +813,8 @@ namespace Lock_Shoot_Tone_Ping
                 }
             }
         }
+
+
+
     }
 }
