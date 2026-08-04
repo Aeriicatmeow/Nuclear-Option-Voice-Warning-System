@@ -168,6 +168,10 @@ namespace Lock_Shoot_Tone_Ping
         public AudioClip Search(string Name)
         {
             AudioClip ReturnClip;
+            if (Name == NoAudio)
+            {
+                return null;
+            }
             if(AudioDictionary.TryGetValue(Name, out ReturnClip))
             {
                 return ReturnClip;
@@ -176,6 +180,15 @@ namespace Lock_Shoot_Tone_Ping
             {
                 return null;
             }
+
+            //if(AudioDictionary.TryGetValue(Name, out ReturnClip))
+            //{
+            //    return ReturnClip;
+            //}
+            //else
+            //{
+            //    return null;
+            //}
         }
 
         public string[] CreateArrayOfAudioNames()
@@ -336,7 +349,12 @@ namespace Lock_Shoot_Tone_Ping
         {
             if (!Source.isPlaying & AudioQueue.Count > 0)
             {
-                PlayAudio(AudioQueue.Dequeue(),true);
+                AudioClip CurrentAudio = null;
+                while(CurrentAudio == null)
+                {
+                    CurrentAudio = AudioQueue.Dequeue();
+                }
+                PlayAudio(CurrentAudio,true);
             }
         }
         public void AddToQueue(string Name)
