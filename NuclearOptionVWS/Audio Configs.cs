@@ -14,6 +14,8 @@ namespace NuclearOptionVWS
     #region AudioStorage
     internal static class MiscData
     {
+        public const int FirstStagePriority = Int16.MinValue;
+        public const int SecondStagePriority = Int32.MinValue;
         public const string PriorityDescriptionText = "(Higher number = Higher Priority). A priority of 0 will result in the audio not being played at all";
         public static int[] GetPriorityDropDownArray()
         {
@@ -34,6 +36,14 @@ namespace NuclearOptionVWS
             {
                 return AudioHandler.NoAudio;
             }
+        }
+        public static double ApplyDistanceInclusivePriority(int BasePriority, float Distance)
+        {
+            return BasePriority + 0.9 * Math.Exp(-Distance / (1000 * 50));
+        }
+        public static double ApplyDistanceInclusivePriority(double Priority, float Distance)
+        {
+            return Math.Floor(Priority) + 0.9 * Math.Exp(-Distance / (1000 * 50));
         }
     }
     internal class BearingAudConfig
@@ -157,6 +167,7 @@ namespace NuclearOptionVWS
     }
     internal class HostileHazardConfig
     {
+        public static Regex CRAMcheck = new Regex("CRAM");
 
         private ConfigEntry<string>[] HostileHazards;
         private ConfigEntry<int>[] Priority;
@@ -235,8 +246,9 @@ namespace NuclearOptionVWS
         }
         public int GetLockedMissilePriority() => Priority[Priority.Length - 1].Value;
         public int GetMissilePriority() => Priority[Priority.Length - 2].Value;
-        public ConfigEntry<string> GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority, bool Locked = false, float AAThreatOverride = -1)
+        public ConfigEntry<string> GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat, out int HazardPriority, bool Locked = false)
         {
+            
             ConfigEntry<string> ReturnConfig;
             if (unit.definition.typeIdentity.missile >= 0.5)
             {
@@ -270,16 +282,7 @@ namespace NuclearOptionVWS
                     }
                 }
 
-                float AAThreat;
-
-                if (AAThreatOverride >= 0)
-                {
-                    AAThreat = AAThreatOverride;
-                }
-                else
-                {
-                    AAThreat = unit.definition.roleIdentity.antiAir;
-                }
+                float AAThreat = GetAAThreat(unit);
 
                 if (AAThreat >= MinAirThreat.Value + (1 - MinAirThreat.Value) / 2)
                 {
@@ -296,6 +299,31 @@ namespace NuclearOptionVWS
                 HazardPriority = 0;
             }
             return ReturnConfig;
+        }
+        public ConfigEntry<string> GetUnitAudio(Unit unit, ConfigEntry<float> MinAirThreat)
+        {
+            int tmp;
+            return GetUnitAudio(unit, MinAirThreat, out tmp);
+        }
+        public bool IsUnitExcludedViaConfig(Unit unit, Aircraft PlayerAircraft,ConfigEntry<float> MinThreatConfig, bool IsLocked)
+        {
+            int ThreatPriority;
+            ConfigEntry<string> AudioToUse = GetUnitAudio(unit, MinThreatConfig, out ThreatPriority, IsLocked);
+
+            return !(ThreatPriority > 0 & AudioToUse.Value != AudioHandler.NoAudio);
+
+
+
+        }
+        public static float GetAAThreat(Unit unit)
+        {
+            float AAthreat = unit.definition.roleIdentity.antiAir;
+            if (HostileHazardConfig.CRAMcheck.Match(unit.unitName).Success)
+            {
+                AAthreat = 0.6f;//I justify this by saying that the CRAM is very similar to the SPAAG. NO said that CRAM poses no risk to aircraft. this is wrong imo.
+                                //Ill say that CRAM is slightly weaker than SPAAG (0.7) as NO seems to think it poses no airthreat
+            }
+            return AAthreat;
         }
         public void AddToCFGDictionary(ref ExternalPackHandler EPH)
         {
@@ -417,54 +445,68 @@ namespace NuclearOptionVWS
         private bool DangerCloseFired = true;
         private bool FlaresLowFired = true;
         private bool CapacitorLowFired = true;
-        public void AddInstructionWarnings(ref List<VWSWarning> Warnings, Aircraft PlayerAircraft, AudioHandler Audio)
+        public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin)
         {
             int Priority = CFG_InstructionHazardPriority.Value;
 
             float Alt = PlayerAircraft.radarAlt;
-            float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
-
-            float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
-            //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
-
-            if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
+            //These need to be considered as valuable constant warnings along the others
+            if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
             {
-                ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
-                if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
-                {
-                    FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
-                }
-                else
-                {
-                    FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
-                }
 
 
-                if (Math.Abs(BankAngle) > 60)
+                float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
+
+                float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
+                                                                                                      //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
+
+                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
                 {
-                    if (BankAngle < 0)
+                    ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
+                    if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
+                        FatalTrajectory = true;
+                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
                     }
                     else
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
+                        FatalTrajectory = true;
+                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
+                    }
+
+
+                    if (Math.Abs(BankAngle) > 60)
+                    {
+                        if (BankAngle < 0)
+                        {
+                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
+                        }
+                        else
+                        {
+                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
+                        }
+                    }
+                    else
+                    {
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
+                    }
+
+                    foreach (ConfigEntry<string> s in AltitudeWarningLine)
+                    {
+                        Audio.AddToQueueNoDuplicates(s.Value);
                     }
                 }
                 else
                 {
-                    AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
+                    FatalTrajectory = false;
                 }
 
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, AltitudeWarningLine, PlayerAircraft, 0, true)), PlayerAircraft);
+                //OverG
+                if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
+                {
+                    Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("OverG").Value);
+                }
             }
-            else
-            {
-                FatalTrajectory = false;
-            }
-
             //one off things will be injected directly into the audio handler so they cannot be ignored
 
             if (Alt >= CFG_DangerousAltitude.Value)
@@ -477,11 +519,7 @@ namespace NuclearOptionVWS
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Dangerous Altitude").Value);
             }
 
-            //OverG
-            if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
-            {
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(Priority, CFG_InstructionHazards.Get("OverG"), PlayerAircraft, 0, true)), PlayerAircraft);
-            }
+
 
             //Flares
             if (PlayerAircraft.countermeasureManager.GetActiveCountermeasure().ammo >= 14)
@@ -516,13 +554,10 @@ namespace NuclearOptionVWS
             //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
             if (CheckIfEjectAdvisable(PlayerAircraft))
             {
-                string EjectAudio = CFG_InstructionHazards.Get("Eject").Value;
-                if (!Audio.CheckIfQueueContains(EjectAudio))
-                {
-                    Audio.AddToQueue(EjectAudio);
-                }
+                Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value);
             }
         }
+
 
         private bool FatalAoA = false;
         private bool FatalTrajectory = false;
@@ -668,16 +703,15 @@ namespace NuclearOptionVWS
 
 
         }
-        public void CheckAoAWarning(Aircraft Aircraft, float StallHornThreshold, float VelocityThreshold, ref List<VWSWarning> Warnings)
+        public void CheckAoAWarning(Aircraft Aircraft, float StallHornThreshold, float VelocityThreshold, AudioHandler Audio)
         {
             //AoA warning
             Vector3 vector = Aircraft.cockpit.transform.InverseTransformDirection(Aircraft.cockpit.rb.velocity);
             float num = Mathf.Atan2(vector.y, vector.z) * -57.29578f;
             Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f)
-            {
-
-                VWSWarning.AddWarningSafe(ref Warnings, (new VWSWarning(CFG_InstructionHazardPriority.Value, CFG_InstructionHazards.Get("AoA"), Aircraft, 0, true)), Aircraft);
+            { 
+                Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("AoA").Value);
                 if (num > StallHornThreshold)
                 {
                     FatalAoA = true;
@@ -724,6 +758,45 @@ namespace NuclearOptionVWS
             }
 
 
+        }
+        public ConfigEntry<string> GetMissileResponseAudio(Unit unit, Aircraft PlayerAircraft)
+        {
+            if (CheckIfResponseIsNeeded(unit, PlayerAircraft))
+            {
+
+                float Distance = FastMath.Distance(PlayerAircraft.GlobalPosition(), unit.GlobalPosition()) / 1000;
+                string EndInstruction;
+                if (unit.definition.typeIdentity.radar >= 0.5)
+                {
+                    float RelBearing = BearingAudConfig.GetRelativeBearing(PlayerAircraft, unit.GlobalPosition());
+                    if (CheckIfAtValue(90, 10, RelBearing) || CheckIfAtValue(270, 10, RelBearing) || Distance < 2)
+                    {
+                        EndInstruction = "Jammer";
+                    }
+                    else
+                    {
+                        EndInstruction = "Notch";
+                    }
+                }
+                else
+                {
+                    Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
+                    if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
+                    {
+                        EndInstruction = "Flare";
+                    }
+                    else
+                    {
+                        EndInstruction = "Decrease Throttle";
+                    }
+                }
+                return CFG_InstructionHazards.Get(EndInstruction);
+            }
+            return null;
+        }
+        public bool CheckIfResponseIsNeeded(Unit unit, Aircraft PlayerAircraft)
+        {
+            return CheckIfMissileLocked(unit, PlayerAircraft) & CFG_InstructMissileCounterMeasures.Value;
         }
         private bool CheckIfAtValue(float Targetvalue, float Uncertainty, float QueryValue) => (QueryValue > Targetvalue - Uncertainty & QueryValue < Targetvalue + Uncertainty);
 

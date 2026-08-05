@@ -25,6 +25,7 @@ namespace NuclearOptionVWS;
 public class Plugin : BaseUnityPlugin
 {
 
+
     #region MainPlugin
     private const string FileModName = "NuclearOption-VWS";
     bool DeletePluginDllOnClose = false;
@@ -60,7 +61,10 @@ public class Plugin : BaseUnityPlugin
     InstructionHazard CFG_InstructionHazardAudio;
 
     //Evidence Of Poor Programming:
-    List<VWSWarning> VWSList; 
+    List<VWSWarning> VWSList;
+
+    List<Unit> NotableUnits;
+    List<double> NotableUnitInternalPriority;
 
 
     public void Log(LogLevel LogLevel, object Data)
@@ -181,50 +185,42 @@ public class Plugin : BaseUnityPlugin
     private void Update()
     {
         Logger.LogInfo("UPDATE");
-        //try
-        //{
-        //    PackHandler.UpdateActivePack();
-        //}
-        //catch(Exception EXP)
-        //{
-        //    Logger.LogFatal(EXP);
-        //}
+        try
+        {
+            PackHandler.UpdateActivePack();
+        }
+        catch (Exception EXP)
+        {
+            Logger.LogFatal(EXP);
+        }
 
-        //if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null)
-        //{
-        //    NullPosition = false;
-        //    PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
-        //    PlayerHQ = SceneSingleton<DynamicMap>.i.HQ;
+        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null)
+        {
+            NullPosition = false;
+            PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
+            PlayerHQ = SceneSingleton<DynamicMap>.i.HQ;
 
-        //    try
-        //    {
-        //        Audio.Update();
-        //    }
-        //    catch(Exception EXP)
-        //    {
-        //        Logger.LogFatal(EXP);
-        //    }
-        //}
-        //else
-        //{
-        //    NullPosition = true;
-        //    Audio.ClearQueue();
+            try
+            {
+                Audio.Update();
+            }
+            catch (Exception EXP)
+            {
+                Logger.LogFatal(EXP);
+            }
+        }
+        else
+        {
+            NullPosition = true;
+            Audio.ClearQueue();
 
-        //    CFG_InstructionHazardAudio.ResetAll();
-        //}
+            CFG_InstructionHazardAudio.ResetAll();
+        }
 
-        //if (!NullPosition)
-        //{
-        //    try
-        //    {
-        //        CFG_InstructionHazardAudio.AddInstructionWarnings(ref VWSList, PlayerAircraft, Audio);
-        //        VWSListUpdate();
-        //    }
-        //    catch (Exception EXP)
-        //    {
-        //        Logger.LogFatal(EXP);
-        //    }
-        //}
+        if (!NullPosition)
+        {
+            UpdateNotableUnits();
+        }
 
     }
 
@@ -358,53 +354,17 @@ public class Plugin : BaseUnityPlugin
                 {
                     IsLocked = InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft);
                 }
-
-                GlobalPosition EnemyPosition = unit.GlobalPosition();
-                GlobalPosition PlayerPosition = PlayerAircraft.GlobalPosition();
-                double Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
                 //Logger.LogInfo("2nd cull");
 
 
-                if (CheckIfValidForCallout(unit, Distance) || IsLocked) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
+                if (CheckIfValidForCallout(unit,IsLocked)) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
                 {
 
-                    Logger.LogInfo(unit.Identity + " BUMPED");
-                    if (!VWSWarning.CheckIfUnitPresentAndBump(ref VWSList, unit, PlayerAircraft))
+                    Logger.LogInfo(unit.Identity + "Is Valid");
+                    if (!NotableUnits.Contains(unit))
                     {
-
-
-                        Logger.LogInfo("HAZARD AUDIO");
-                        int Priority;
-                        ConfigEntry<string> HazardAudio = CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority, IsLocked);
-
-
-                        if (IsLocked)
-                        {
-                            Logger.LogInfo("ITS LOCKED");
-                        }
-
-
-                        Logger.LogInfo("BEARING AUDIO");
-                        List<ConfigEntry<string>> AudioNames = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, EnemyPosition).ToList();
-                        foreach (ConfigEntry<string> s in AudioNames)
-                        {
-                            Logger.LogInfo(s);
-                        }
-                        Logger.LogInfo("HAZARD AUDIO: " + HazardAudio);
-                        AudioNames.Insert(0, HazardAudio);
-                        Logger.LogInfo("SCRIPT");
-                        foreach (ConfigEntry<string> s in AudioNames)
-                        {
-                            Logger.LogInfo(s.Value);
-                        }
-
-                        Logger.LogInfo("FINAL WARNING");
-                        VWSWarning Warning = new VWSWarning(Priority, AudioNames, unit, Distance);
-                        CFG_InstructionHazardAudio.AppendMissileWarning(ref Warning, PlayerAircraft);
-                        VWSWarning.AddWarning(ref VWSList, Warning);
-                        Logger.LogInfo("Done :)");
-
-                        VWSWarning.AddWarningSafe(ref VWSList, Warning, PlayerAircraft);
+                        NotableUnits.Add(unit);
+                        NotableUnitInternalPriority.Add(GetBasePriority(unit));
                     }
                 }
             }
@@ -414,40 +374,146 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
     }
-    private void BearingDebug(Unit unit, Aircraft Player, GlobalPosition EnemyPosition)
+    private void UpdateNotableUnits()
     {
-        GlobalPosition PlayerPosition = Player.GlobalPosition();
-        float dx = PlayerPosition.x - EnemyPosition.x;
-        float dz = PlayerPosition.z - EnemyPosition.z;
-        float dy = PlayerPosition.y - EnemyPosition.y;
-        float Distance = FastMath.Distance(PlayerPosition, EnemyPosition);
+        
+        int Index = 0;
+        int HighIndex = 0;
 
-        //Z is northways apparently...which isnt very intuative but oh well
-        //float RelativeBearing = (float)((Math.Atan2(dx, dz) + 3 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) ;
-        //float ChordDeviation = (float) ((Math.Atan2(dy, Distance) + 2 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) ;
-        float RelativeBearing = BearingAudConfig.GetRelativeBearing(Player, EnemyPosition);
-        float ChordDeviation = BearingAudConfig.GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition);
-        Logger.LogInfo("[DEBUG]");
-        Logger.LogInfo("Bearing to Hazard: " + unit.unitName + $"({unit.definition.code})" + " : " + (RelativeBearing) + " TO " + unit.GlobalPosition());
-        Logger.LogInfo("ROLES:  AA: " + unit.definition.roleIdentity.antiAir + " AG: " + unit.definition.roleIdentity.antiSurface + " AM: " + unit.definition.roleIdentity.antiMissile + " AR: " + unit.definition.roleIdentity.antiRadar);
-        Logger.LogInfo("ANGLE DIFF: " + (ChordDeviation));
-        Logger.LogInfo("TYPE: S: " + unit.definition.typeIdentity.surface + " A: " + unit.definition.typeIdentity.air + " M: " + unit.definition.typeIdentity.missile + " R: " + unit.definition.typeIdentity.radar);
-        Logger.LogInfo("Local Bearing: " + PlayerAircraft.rb.rotation.eulerAngles.y);
-        Logger.LogInfo("Position " + PlayerAircraft.GlobalPosition());
-        Logger.LogInfo("Pitch " + PlayerAircraft.rb.rotation.eulerAngles.x);
-        Logger.LogInfo("Yaw: " + PlayerAircraft.rb.rotation.eulerAngles.y);
-        Logger.LogInfo("Roll: " + PlayerAircraft.rb.rotation.eulerAngles.z);
-        //Logger.LogInfo("PRE CONSIDERATIONS RAW: DALT: " + ChordDeviation + " DBEAR: " + RelativeBearing);
-        Logger.LogInfo("UNIT ID " + unit.Identity);
-        //(Pitch,Yaw, Roll)
-        //note that pitch is inverted
-        //Bearings are slightly off but thats a nuclear option problem. not a me problem
+        double HighestPriority = int.MinValue;
+        while (Index < NotableUnits.Count)
+        {
+
+            if (NotableUnits[Index].NetId == 0)
+            {
+                NotableUnits.RemoveAt(Index);
+                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+            }
+
+            if (CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
+            {
+                NotableUnits.RemoveAt(Index);
+                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+            }
+            else
+            {
+
+                if (NotableUnitInternalPriority[Index] > 0 & NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority)//If its negetive, its already been called out.
+                                                                                                                //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
+                                                                                                                //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
+                                                                                                                //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
+                                                                                                                //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
+                                                                                                                //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
+                {
+                    NotableUnitInternalPriority[Index] = MiscData.ApplyDistanceInclusivePriority(NotableUnitInternalPriority[Index], FastMath.Distance(NotableUnits[Index].GlobalPosition(), PlayerAircraft.GlobalPosition()));
+                }
+
+                if(NotableUnitInternalPriority[Index] > HighestPriority)
+                {
+                    HighestPriority = NotableUnitInternalPriority[Index];
+                    HighIndex = Index;
+                }
+                
+
+                Index++;
+            }
+
+        }
+
+        if(Audio.GetQueueLength() == 0)
+        {
+            Index = NotableUnitInternalPriority.IndexOf(MiscData.SecondStagePriority);
+            if(Index != -1)
+            {
+                //
+                AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
+                NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+            }
+            else
+            {
+                Index = NotableUnitInternalPriority.IndexOf(MiscData.FirstStagePriority);
+
+                if (Index != -1)
+                {
+                    //
+                    AddHazardBearingOnlyToAudioList(NotableUnits[Index]);
+                    if (CFG_InstructionHazardAudio.CheckIfResponseIsNeeded(NotableUnits[Index], PlayerAircraft))
+                    {
+                        NotableUnitInternalPriority[Index] = MiscData.SecondStagePriority;
+                    }
+                    else
+                    {
+                        NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+                    }
+                }
+                else
+                {
+                    Index = HighIndex;
+                    //
+                    AddHazardNameOnlyToAudioList(NotableUnits[Index]);
+                    NotableUnitInternalPriority[Index] = MiscData.FirstStagePriority;
+                }
+            }
+        }
+        
+    }
+    public int GetHighestBasePriority()
+    {
+        int High = -1;
+        foreach(Unit u in NotableUnits)
+        {
+            int Priority = GetBasePriority(u);
+            if (Priority > High)
+            {
+                High = Priority;
+            }
+        }
+        return High;
     }
 
-    private Regex CRAMcheck = new Regex("CRAM");
-
-    private bool CheckIfValidForCallout(Unit unit, double Distance)
+    private void AddHazardNameOnlyToAudioList(Unit unit)
     {
+        Audio.AddToQueue(CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat).Value);
+    }
+    private void AddHazardBearingOnlyToAudioList(Unit unit)
+    {
+        ConfigEntry<string>[] PositionAudio = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, unit.GlobalPosition());
+        foreach (ConfigEntry<string> s in PositionAudio)
+        {
+            Audio.AddToQueue(s.Value);
+        }
+    }
+    private void AddHazardAdviceOnlyToAudioList(Unit unit)
+    {
+        ConfigEntry<string> Advice = CFG_InstructionHazardAudio.GetMissileResponseAudio(unit, PlayerAircraft);
+        if(Advice != null)
+        {
+            Audio.AddToQueue(Advice.Value);
+        }
+    }
+
+    
+    private int GetBasePriority(Unit unit)
+    {
+        int Priority;
+        CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat, out Priority, InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft));
+        return Priority;
+    }
+    public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
+    {
+
+        if (LockedOverride)
+        {
+            return true;
+        }
+        CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false);
+
+        
+
+        GlobalPosition EnemyPosition = unit.GlobalPosition();
+        GlobalPosition PlayerPosition = PlayerAircraft.GlobalPosition();
+        double Distance = FastMath.Distance(EnemyPosition, PlayerPosition);
+
         float MaxConsiderationDistance;
         bool IsGround;
         bool IsMissile = unit.definition.typeIdentity.missile >= 0.5;
@@ -477,12 +543,7 @@ public class Plugin : BaseUnityPlugin
             }
             else
             {
-                float AAthreat = unit.definition.roleIdentity.antiAir;
-                if (CRAMcheck.Match(unit.unitName).Success)
-                {
-                    AAthreat = 0.6f;//I justify this by saying that the CRAM is very similar to the SPAAG. NO said that CRAM poses no risk to aircraft. this is wrong imo.
-                    //Ill say that CRAM is slightly weaker than SPAAG (0.7) as NO seems to think it poses no airthreat
-                }
+                float AAthreat = HostileHazardConfig.GetAAThreat(unit);
 
                 if(CFG_OnlyCallOutLockedAirMissiles.Value & unit.definition.typeIdentity.missile >= 0.5 & !InstructionHazard.CheckIfMissileLocked(unit,PlayerAircraft))
                 {
@@ -538,7 +599,7 @@ public class Plugin : BaseUnityPlugin
         {
             try
             {
-                CFG_InstructionHazardAudio.CheckAoAWarning(PlayerAircraft, StallHornThreshold, VelocityThreshold, ref VWSList);
+                CFG_InstructionHazardAudio.CheckAoAWarning(PlayerAircraft, StallHornThreshold, VelocityThreshold, Audio);
             }
             catch (Exception EXP)
             {

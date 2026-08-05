@@ -361,9 +361,17 @@ namespace Lock_Shoot_Tone_Ping
         {
             AudioQueue.Enqueue(Search(Name));
         }
+        public void AddToQueueNoDuplicates(string Name)
+        {
+            AudioClip Audio = Search(Name);
+            if (!AudioQueue.Contains(Audio))
+            {
+                AddToQueue(Audio);
+            }
+        }
         public void AddToQueue(AudioClip Audio)
         {
-            AudioQueue.AddItem(Audio);
+            AudioQueue.Enqueue(Audio);
         }
         public void ClearQueue()
         {
