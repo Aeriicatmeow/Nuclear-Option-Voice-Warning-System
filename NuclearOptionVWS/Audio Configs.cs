@@ -451,60 +451,66 @@ namespace NuclearOptionVWS
 
             float Alt = PlayerAircraft.radarAlt;
             //These need to be considered as valuable constant warnings along the others
-            if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
+
+
+
+            float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
+
+            float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
+                                                                                                    //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
+
+            if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
             {
-
-
-                float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
-
-                float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
-                                                                                                      //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
-
-                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
+                ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
+                if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
                 {
-                    ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
-                    if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
+                    FatalTrajectory = true;
+                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
+                }
+                else
+                {
+                    FatalTrajectory = true;
+                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
+                }
+
+
+                if (Math.Abs(BankAngle) > 60)
+                {
+                    if (BankAngle < 0)
                     {
-                        FatalTrajectory = true;
-                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
                     }
                     else
                     {
-                        FatalTrajectory = true;
-                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
-                    }
-
-
-                    if (Math.Abs(BankAngle) > 60)
-                    {
-                        if (BankAngle < 0)
-                        {
-                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
-                        }
-                        else
-                        {
-                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
-                        }
-                    }
-                    else
-                    {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
-                    }
-
-                    foreach (ConfigEntry<string> s in AltitudeWarningLine)
-                    {
-                        Audio.AddToQueueNoDuplicates(s.Value);
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
                     }
                 }
                 else
                 {
-                    FatalTrajectory = false;
+                    AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
                 }
 
-                //OverG
+                if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
+                {
+                    Plugin.I.ConsiderInterrupt(PlayerAircraft);
+                    foreach (ConfigEntry<string> s in AltitudeWarningLine)
+                    {
+                        Audio.AddToQueueNoDuplicatesLowPriority(s.Value);
+                    }
+                }
+            }
+            else
+            {
+                FatalTrajectory = false;
+            }
+
+            //OverG
+            if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
+            {
                 if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
                 {
-                    Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("OverG").Value);
+                    Plugin.I.ConsiderInterrupt(PlayerAircraft);
+                    Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
                 }
             }
             //one off things will be injected directly into the audio handler so they cannot be ignored
@@ -629,6 +635,7 @@ namespace NuclearOptionVWS
             BINGOTriggered = false;
             CheckFuelTriggered = false;
             FuelLowTriggered = false;
+            ResetBINGOData();
         }
         public void ResetBINGOData()
         {
@@ -711,7 +718,7 @@ namespace NuclearOptionVWS
             Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f)
             { 
-                Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("AoA").Value);
+                Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("AoA").Value);
                 if (num > StallHornThreshold)
                 {
                     FatalAoA = true;
@@ -721,43 +728,6 @@ namespace NuclearOptionVWS
             {
                 FatalAoA = false;
             }
-        }
-        public void AppendMissileWarning(ref VWSWarning Warning, Aircraft PlayerAircraft)
-        {
-
-            if (CheckIfMissileLocked(Warning.UnitCalled, PlayerAircraft) & CFG_InstructMissileCounterMeasures.Value)
-            {
-
-                float Distance = FastMath.Distance(PlayerAircraft.GlobalPosition(), Warning.UnitCalled.GlobalPosition()) / 1000;
-                string EndInstruction;
-                if (Warning.UnitCalled.definition.typeIdentity.radar >= 0.5)
-                {
-                    float RelBearing = BearingAudConfig.GetRelativeBearing(PlayerAircraft, Warning.UnitCalled.GlobalPosition());
-                    if (CheckIfAtValue(90, 10, RelBearing) || CheckIfAtValue(270, 10, RelBearing) || Distance < 2)
-                    {
-                        EndInstruction = "Jammer";
-                    }
-                    else
-                    {
-                        EndInstruction = "Notch";
-                    }
-                }
-                else
-                {
-                    Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
-                    if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
-                    {
-                        EndInstruction = "Flare";
-                    }
-                    else
-                    {
-                        EndInstruction = "Decrease Throttle";
-                    }
-                }
-                Warning.audioNames.Add(CFG_InstructionHazards.Get(EndInstruction));
-            }
-
-
         }
         public ConfigEntry<string> GetMissileResponseAudio(Unit unit, Aircraft PlayerAircraft)
         {
@@ -823,344 +793,5 @@ namespace NuclearOptionVWS
         }
     }
 
-    internal class VWSWarning//technically should be a struct but i dont want values to be copied
-
-    {
-        public static BearingAudConfig BearingConfig;
-        public static InstructionHazard InstructionHazardConfig;
-        public static HostileHazardConfig HostileHazardsConfig;
-        public static Plugin MainPlugin;
-
-        public List<ConfigEntry<string>> audioNames;
-        public double Priority;
-        public bool Played;
-        public int UpdatesSinceBumped;
-
-        public float TimeOfLastPlayed;
-
-        public Unit UnitCalled;
-
-        public bool IsInstruction;
-        public bool IsLocked;
-
-        public static void SetAdditionalFields(BearingAudConfig bearingAudConfig, InstructionHazard instructionHazard, HostileHazardConfig hostileHazardConfig, Plugin Plugin)
-        {
-            BearingConfig = bearingAudConfig;
-            InstructionHazardConfig = instructionHazard;
-            HostileHazardsConfig = hostileHazardConfig;
-            MainPlugin = Plugin;
-        }
-        public VWSWarning(int Priority, List<ConfigEntry<string>> AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
-        {
-            this.audioNames = AudioNames;
-            this.Priority = Priority;
-            this.Priority = DistanceInclusivePriority(Distance);
-            Played = false;
-            this.IsInstruction = IsInstruction;
-            UpdatesSinceBumped = 0;
-            UnitCalled = Unit;
-            this.IsLocked = IsLocked;
-            TimeOfLastPlayed = 0;
-        }
-        public VWSWarning(int Priority, ConfigEntry<string>[] AudioNames, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
-        {
-            this.audioNames = AudioNames.ToList();
-            this.Priority = Priority;
-            this.Priority = DistanceInclusivePriority(Distance);
-            Played = false;
-            this.IsInstruction = IsInstruction;
-            UpdatesSinceBumped = 0;
-            UnitCalled = Unit;
-            this.IsLocked = IsLocked;
-            TimeOfLastPlayed = 0;
-        }
-        public VWSWarning(int Priority, ConfigEntry<string> AudioName, Unit Unit, double Distance, bool IsInstruction = false, bool IsLocked = false)
-        {
-
-            this.audioNames = new List<ConfigEntry<string>>();
-            this.audioNames.Add(AudioName);
-            this.Priority = Priority;
-            this.Priority = DistanceInclusivePriority(Distance);
-            Played = false;
-            this.IsInstruction = IsInstruction;
-            UpdatesSinceBumped = 0;
-            UnitCalled = Unit;
-            this.IsLocked = IsLocked;
-            TimeOfLastPlayed = 0;
-        }
-        private double DistanceInclusivePriority(double Distance)
-        {
-            return Math.Floor(Priority) + 0.9 * Math.Exp(-Distance / (1000 * 50));
-        }
-        public void IncrementBump()
-        {
-            UpdatesSinceBumped += 1;
-        }
-        public void Bump(Aircraft Player, bool RenewBearing = true)
-        {
-            UpdatesSinceBumped = 0;
-            UpdateAccuracy(Player, RenewBearing);
-
-
-        }
-        public void UpdateAccuracy(Aircraft Player, bool RenewBearing)
-        {
-            if (UnitCalled.definition.typeIdentity.missile >= 0.5)
-            {
-                if (!InstructionHazard.CheckIfMissileLocked(UnitCalled, Player))
-                {
-                    Priority = HostileHazardsConfig.GetMissilePriority();
-                    if (MainPlugin.CFG_OnlyCallOutLockedAirMissiles.Value)
-                    {
-                        Plugin.I.Log(LogLevel.Info, "MISSILE NOLONGER TRACKING. WIPING");
-                        Priority = 0;
-                    }
-
-                }
-                else if (MainPlugin.CFG_HighCautionMode.Value)
-                {
-                    Priority = HostileHazardsConfig.GetLockedMissilePriority();
-
-                }
-            }
-
-            Priority = DistanceInclusivePriority(FastMath.Distance(Player.GlobalPosition(), UnitCalled.GlobalPosition()));
-
-            if (RenewBearing)
-            {
-                Plugin.I.Log(LogLevel.Info, "Renewing Bearing");
-                ConfigEntry<string> tmp = audioNames[0];
-                audioNames = BearingConfig.GetPositionAudioString(Player, UnitCalled.GlobalPosition()).ToList();
-                audioNames.Insert(0, tmp);
-
-                VWSWarning Warning = this;
-                InstructionHazardConfig.AppendMissileWarning(ref Warning, Player);
-            }
-        }
-        public void BumpAdvanced(Aircraft Player, ref List<VWSWarning> WarningList, int IndexOverride = -1)
-        {
-            Bump(Player, !IsInstruction);
-            int CurrentIndex;
-            if (IndexOverride < 0)
-            {
-                CurrentIndex = WarningList.IndexOf(this);
-            }
-            else
-            {
-                CurrentIndex = IndexOverride;
-            }
-            if (CurrentIndex + 1 >= WarningList.Count)
-            {
-                return;
-            }
-            Plugin.I.Log(LogLevel.Info, CurrentIndex + "/" + WarningList.Count);
-            while (WarningList[CurrentIndex].Priority > WarningList[CurrentIndex + 1].Priority)
-            {
-                //Plugin.I.Log(LogLevel.Info, "BA loop");
-                SwapIndexes(CurrentIndex, CurrentIndex + 1, ref WarningList);
-                CurrentIndex++;
-                if (CurrentIndex + 1 >= WarningList.Count)
-                {
-                    Plugin.I.Log(LogLevel.Info, "Terminating");
-                    break;
-                }
-                Plugin.I.Log(LogLevel.Info, CurrentIndex + "/" + WarningList.Count);
-            }
-        }
-        public void CreateLogDump()
-        {
-            string LogLineOne = "VWS: [" + UnitCalled.Identity + "]| ";
-            foreach (ConfigEntry<string> s in audioNames)
-            {
-                LogLineOne += s.Value + "; ";
-            }
-            Plugin.I.Log(LogLevel.Info, LogLineOne);
-            Plugin.I.Log(LogLevel.Info, "PR: " + Priority + " TimeSinceBumped: " + UpdatesSinceBumped + " Played:" + Played);
-        }
-        public static void SwapIndexes(int Index1, int Index2, ref List<VWSWarning> WarningList)
-        {
-            VWSWarning tmp = WarningList[Index1];
-            WarningList[Index1] = WarningList[Index2];
-            WarningList[Index2] = tmp;
-        }
-        public static bool CheckIfSameContents(VWSWarning Msg1, VWSWarning Msg2)
-        {
-            if (Msg1.audioNames.Count != Msg2.audioNames.Count)
-            {
-                return false;
-            }
-            if (Math.Floor(Msg1.Priority) != Math.Floor(Msg2.Priority))
-            {
-                return false;
-            }
-            for (int i = 0; i < Msg1.audioNames.Count; i++)
-            {
-                if (Msg1.audioNames[i] != Msg2.audioNames[i])
-                {
-                    return false;
-                }
-            }
-            return true;
-
-        }
-        public static void AddWarningSafe(ref List<VWSWarning> WarningList, VWSWarning Warning, Aircraft PlayerAircraft)
-        {
-            if (!CheckIfPresentAndBump(ref WarningList, Warning, PlayerAircraft))
-            {
-                AddWarning(ref WarningList, Warning);
-            }
-            else
-            {
-                Plugin.I.Log(LogLevel.Info, "SIMILAR WARNING FOUND");
-            }
-        }
-        public static void AddWarning(ref List<VWSWarning> WarningList, VWSWarning Warning)
-        {
-            int upper = WarningList.Count - 1;
-            int lower = 0;
-            int index;
-
-            if (WarningList.Count == 0)
-            {
-                WarningList.Add(Warning);
-            }
-
-            if (WarningList[WarningList.Count - 1].Priority < Warning.Priority)
-            {
-                WarningList.Add(Warning);
-            }
-            if (WarningList[0].Priority > Warning.Priority)
-            {
-                WarningList.Insert(0, Warning);
-            }
-
-            while (upper - lower > 1)
-            {
-                //Plugin.I.Log(LogLevel.Info, "VWS ADD loop");
-                index = (upper + lower) / 2;
-                Plugin.I.Log(LogLevel.Info, "U:" + upper + " L:" + lower + " I:" + index);
-                if (WarningList[index].Priority > Warning.Priority)
-                {
-                    upper = index;
-                }
-                else if (WarningList[index].Priority < Warning.Priority)
-                {
-                    lower = index;
-                }
-                else
-                {
-                    upper = index;
-                    lower = index;
-                }
-
-            }
-
-            index = lower;
-
-            while (WarningList[index].Priority < Warning.Priority)
-            {
-                index++;
-                if (index == WarningList.Count)
-                {
-                    WarningList.Add(Warning);
-                }
-            }
-            WarningList.Insert(index, Warning);
-
-        }
-        private static int GetIndexOfLowestPriorityInSection(List<VWSWarning> WarningList, int PrioritySection)
-        {
-            Plugin.I.Log(LogLevel.Info, WarningList.Count);
-            if (WarningList.Count == 0)
-            {
-                return -1;
-            }
-            int upper = WarningList.Count - 1;
-            int lower = 0;
-            int index;
-            while (upper - lower > 1)
-            {
-                //Plugin.I.Log(LogLevel.Info, "Priority LOW loop");
-                index = (upper + lower) / 2;
-                Plugin.I.Log(LogLevel.Info, "U:" + upper + " L:" + lower + " I:" + index);
-                if (WarningList[index].Priority > PrioritySection)
-                {
-                    upper = index;
-                }
-                else if (WarningList[index].Priority < PrioritySection)
-                {
-                    lower = index;
-                }
-                else
-                {
-                    upper = index;
-                    lower = index;
-                }
-
-            }
-            index = lower;
-            Plugin.I.Log(LogLevel.Info, "Index:" + index);
-            if (Math.Floor(WarningList[index].Priority) < PrioritySection)
-            {
-                index++;
-                if (index >= WarningList.Count)
-                {
-                    return -1;
-                }
-            }
-
-            if (Math.Floor(WarningList[index].Priority) == PrioritySection)
-            {
-                return index;
-            }
-            else
-            {
-                return -1;
-            }
-        }
-        public static bool CheckIfPresentAndBump(ref List<VWSWarning> WarningList, VWSWarning Warning, Aircraft Player)
-        {
-            for (int index = 0; index < WarningList.Count; index++)
-            {
-
-                if (WarningList[index].UnitCalled == Warning.UnitCalled)
-                {
-                    if ((!Warning.IsInstruction & !WarningList[index].IsInstruction) || CheckIfSameContents(WarningList[index], Warning))
-                    {
-                        WarningList[index].BumpAdvanced(Player, ref WarningList, index);
-                        return true;
-                    }
-                }
-
-            }
-            return false;
-        }
-        public static bool CheckIfUnitPresentAndBump(ref List<VWSWarning> WarningList, Unit unit, Aircraft Player)
-        {
-            for (int index = 0; index < WarningList.Count; index++)
-            {
-
-                if (WarningList[index].UnitCalled == unit)
-                {
-                    WarningList[index].BumpAdvanced(Player, ref WarningList, index);
-                    return true;
-                }
-
-            }
-            return false;
-        }
-
-        public bool CheckIfNoAudioInWarning()
-        {
-            foreach (ConfigEntry<string> s in audioNames)
-            {
-                if (s.Value != AudioHandler.NoAudio)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
     #endregion
 }

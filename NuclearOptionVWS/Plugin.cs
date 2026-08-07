@@ -18,6 +18,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements.Collections;
 using UnityEngine.UI;
+using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
@@ -61,10 +62,10 @@ public class Plugin : BaseUnityPlugin
     InstructionHazard CFG_InstructionHazardAudio;
 
     //Evidence Of Poor Programming:
-    List<VWSWarning> VWSList;
 
     List<Unit> NotableUnits;
     List<double> NotableUnitInternalPriority;
+    int BasePriorityOfLastPlayed;
 
 
     public void Log(LogLevel LogLevel, object Data)
@@ -116,8 +117,9 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
         Logger.LogInfo("Initialising List Of Warnings");
-        VWSWarning.SetAdditionalFields(CFG_PositionCalloutAudio, CFG_InstructionHazardAudio, CFG_HostilehazardsAudio, this);
-        VWSList = new List<VWSWarning>();
+        NotableUnits = new List<Unit>();
+        NotableUnitInternalPriority = new List<double>();
+        BasePriorityOfLastPlayed = 0;
 
         Logger.LogInfo("Generating CFG Dictionary");
         try
@@ -212,131 +214,30 @@ public class Plugin : BaseUnityPlugin
         else
         {
             NullPosition = true;
-            Audio.ClearQueue();
+            Audio.ClearAllQueues();
 
             CFG_InstructionHazardAudio.ResetAll();
         }
 
         if (!NullPosition)
         {
-            UpdateNotableUnits();
-        }
-
-    }
-
-    private void VWSListUpdate()
-    {
-        Logger.LogInfo(VWSList.Count);
-
-
-        int limit = VWSList.Count;
-        int index = 0;
-        Logger.LogInfo("NEW UPDATE");
-        while(index < limit)
-        {
-            //Logger.LogInfo("UPD loop: "+index +"/"+limit);
-            VWSList[index].IncrementBump();
-            //VWSList[index].CreateLogDump();
-            Logger.LogInfo("SECOND");
-            if (VWSList[index].UnitCalled.Identity.NetId == 0 || VWSList[index].CheckIfNoAudioInWarning() || Math.Floor(VWSList[index].Priority) == 0 || (VWSList[index].UpdatesSinceBumped>5 & VWSList[index].IsInstruction)|| VWSList[index].UpdatesSinceBumped > 60)
+            Logger.LogInfo("Main Update Loop");
+            try
             {
-
-                Logger.LogInfo("REMOVING");
-                VWSList[index].CreateLogDump();
-                VWSList.RemoveAt(index);
-                limit--;
-
+                Logger.LogInfo("Instructions");
+                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this);
+                Logger.LogInfo("Hazards");
+                UpdateNotableUnits();
             }
-            else
+            catch (Exception EXP)
             {
-                if (!CheckIfInRange(VWSList[index].UnitCalled, PlayerAircraft))
-                {
-                    Logger.LogInfo("REMOVING");
-                    VWSList.RemoveAt(index);
-                    limit--;
-                }
-                else
-                {
-                    index++;
-                }
+                Logger.LogFatal(EXP);
             }
 
         }
 
-
-        Logger.LogInfo("FINAL PART");
-        if (Audio.GetQueueLength() == 0 & VWSList.Count > 0)
-        {
-            Logger.LogInfo("[CURRENT LIST:]");
-            foreach(VWSWarning s in VWSList)
-            {
-                s.CreateLogDump();
-            }
-            ReadOffHighestPriorities();
-        }
-
-        
-        
     }
-    private void ReadOffHighestPriorities(int HighestPriorityTierOverride = int.MinValue)
-    {
-        int index = VWSList.Count - 1;
-        int HighestPriorityTier = (int)Math.Floor(VWSList[index].Priority);
 
-        if (HighestPriorityTierOverride >= 0)
-        {
-            HighestPriorityTier = HighestPriorityTierOverride;
-        }
-        
-
-
-        Logger.LogInfo("HIGHEST PRIORITY: " + HighestPriorityTier);
-        while (Math.Floor(VWSList[index].Priority) == HighestPriorityTier & VWSList[index].Played /*& (Time.timeSinceLevelLoad - VWSList[index].TimeOfLastPlayed) < CFG_MinimunDelayBetweenWarnings.Value*/)
-        {
-            index--;
-            if(index < 0)
-            {
-                ReloadAllAudioPriorities();
-                return;
-            }
-        }
-
-        VWSWarning WarningToBePlayed = VWSList[index];
-        if (Math.Floor(WarningToBePlayed.Priority) < HighestPriorityTier)
-        {
-            //if (index != VWSList.Count - 1) 
-            //{
-            //    if (Time.timeSinceLevelLoad - VWSList[index+1].TimeOfLastPlayed < CFG_MinimunDelayBetweenWarnings.Value)
-            //    {
-            //        ReadOffHighestPriorities(HighestPriorityTier - 1);
-            //        return;
-            //    }
-            //}
-
-            ReloadAllAudioPriorities();
-            return;
-        }
-        Logger.LogInfo("CURR PRIOR: "+WarningToBePlayed.Priority);
-        WarningToBePlayed.UpdateAccuracy(PlayerAircraft, true);
-        WarningToBePlayed.Played = true;
-        WarningToBePlayed.TimeOfLastPlayed = Time.timeSinceLevelLoad;
-        foreach (ConfigEntry<string> s in WarningToBePlayed.audioNames)
-        {
-            Audio.AddToQueue(MiscData.GetAudioNameProtected(s));
-        }
-
-
-    }
-    private void ReloadAllAudioPriorities()
-    {
-        Audio.AddToQueue("vws_fire");
-        Logger.LogInfo("RELOADING");
-        for (int i = 0; i < VWSList.Count; i++)
-        {
-            VWSList[i].Played = false;
-        }
-        ReadOffHighestPriorities();
-    }
     public void ObserveUnitBearingFromMapIcon(Unit unit, bool IsLocked)
     {
         //Logger.LogInfo("MapIcon Request recieved");
@@ -344,7 +245,8 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo(unit.Identity);
         try
         {
-            
+            //Logger.LogInfo(PlayerAircraft.NetworkHQ);
+            //Logger.LogInfo(unit.NetworkHQ);
 
             if (((PlayerHQ != null & PlayerHQ != unit.NetworkHQ & unit.NetworkHQ != null)
                 ||IsLocked) 
@@ -354,7 +256,7 @@ public class Plugin : BaseUnityPlugin
                 {
                     IsLocked = InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft);
                 }
-                //Logger.LogInfo("2nd cull");
+                Logger.LogInfo("1st calling cull");
 
 
                 if (CheckIfValidForCallout(unit,IsLocked)) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
@@ -363,6 +265,7 @@ public class Plugin : BaseUnityPlugin
                     Logger.LogInfo(unit.Identity + "Is Valid");
                     if (!NotableUnits.Contains(unit))
                     {
+                        Logger.LogInfo("Adding Unit");
                         NotableUnits.Add(unit);
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
                     }
@@ -376,43 +279,69 @@ public class Plugin : BaseUnityPlugin
     }
     private void UpdateNotableUnits()
     {
-        
+        if(Audio.GetQueueLengthLowPriority() > 0)
+        {
+            Logger.LogInfo("Returning notable unit update as the audio queue is occupied");
+            return;
+        }
+        if(NotableUnits.Count == 0)
+        {
+            Logger.LogInfo("Returning notable unit update as there are no notable units in list");
+            return;
+        }
+
         int Index = 0;
         int HighIndex = 0;
+        int LowIndex = 0;
 
         double HighestPriority = int.MinValue;
+        double LowestPriority = int.MaxValue;
+        Logger.LogInfo("Cull Section");
         while (Index < NotableUnits.Count)
         {
 
             if (NotableUnits[Index].NetId == 0)
             {
+                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to NetID of 0 (unit nolonger exists)");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
             }
 
-            if (CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
+            if (!CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
             {
+                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to unit threat nolonger being valid");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
             }
             else
             {
 
-                if (NotableUnitInternalPriority[Index] > 0 & NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority)//If its negetive, its already been called out.
+                if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority)//If its negetive, its already been called out.
                                                                                                                 //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
                                                                                                                 //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
                                                                                                                 //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
                                                                                                                 //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
                                                                                                                 //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
                 {
-                    NotableUnitInternalPriority[Index] = MiscData.ApplyDistanceInclusivePriority(NotableUnitInternalPriority[Index], FastMath.Distance(NotableUnits[Index].GlobalPosition(), PlayerAircraft.GlobalPosition()));
+                    if (NotableUnitInternalPriority[Index] > 0)
+                    {
+                        NotableUnitInternalPriority[Index] = MiscData.ApplyDistanceInclusivePriority(NotableUnitInternalPriority[Index], FastMath.Distance(NotableUnits[Index].GlobalPosition(), PlayerAircraft.GlobalPosition()));
+                    }
+
+                    if (NotableUnitInternalPriority[Index] > HighestPriority)
+                    {
+                        HighestPriority = NotableUnitInternalPriority[Index];
+                        HighIndex = Index;
+                    }
+                    if (NotableUnitInternalPriority[Index] < LowestPriority)
+                    {
+                        LowestPriority = NotableUnitInternalPriority[Index];
+                        LowIndex = Index;
+                    }
+
                 }
 
-                if(NotableUnitInternalPriority[Index] > HighestPriority)
-                {
-                    HighestPriority = NotableUnitInternalPriority[Index];
-                    HighIndex = Index;
-                }
+
                 
 
                 Index++;
@@ -420,42 +349,70 @@ public class Plugin : BaseUnityPlugin
 
         }
 
-        if(Audio.GetQueueLength() == 0)
+        Logger.LogInfo("Execute Section");
+        Logger.LogInfo("HI: " + HighestPriority);
+        Logger.LogInfo("LO: " + LowestPriority);
+
+        Index = NotableUnitInternalPriority.IndexOf(MiscData.SecondStagePriority);
+        if (Index != -1)
         {
-            Index = NotableUnitInternalPriority.IndexOf(MiscData.SecondStagePriority);
-            if(Index != -1)
+            //
+            Logger.LogInfo("Continuing a Missile Hazard. Specify Counterplay");
+            AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
+            NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+        }
+        else
+        {
+            Index = NotableUnitInternalPriority.IndexOf(MiscData.FirstStagePriority);
+
+            if (Index != -1)
             {
                 //
-                AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
-                NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
-            }
-            else
-            {
-                Index = NotableUnitInternalPriority.IndexOf(MiscData.FirstStagePriority);
-
-                if (Index != -1)
+                Logger.LogInfo("Second stage of audio hazard playing - specify bearing");
+                AddHazardBearingOnlyToAudioList(NotableUnits[Index]);
+                if (CFG_InstructionHazardAudio.CheckIfResponseIsNeeded(NotableUnits[Index], PlayerAircraft))
                 {
-                    //
-                    AddHazardBearingOnlyToAudioList(NotableUnits[Index]);
-                    if (CFG_InstructionHazardAudio.CheckIfResponseIsNeeded(NotableUnits[Index], PlayerAircraft))
-                    {
-                        NotableUnitInternalPriority[Index] = MiscData.SecondStagePriority;
-                    }
-                    else
-                    {
-                        NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
-                    }
+                    NotableUnitInternalPriority[Index] = MiscData.SecondStagePriority;
                 }
                 else
                 {
-                    Index = HighIndex;
-                    //
-                    AddHazardNameOnlyToAudioList(NotableUnits[Index]);
-                    NotableUnitInternalPriority[Index] = MiscData.FirstStagePriority;
+                    NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+                }
+            }
+            else
+            {
+                Index = HighIndex;
+                if (HighestPriority != int.MinValue & LowestPriority != int.MaxValue)
+                {
+                    if (HighestPriority >= -LowestPriority || LowestPriority > 0)
+                    {
+                        //
+                        Logger.LogInfo("First stage of audio playing. Specifying hazard");
+                        AddHazardNameOnlyToAudioList(NotableUnits[Index]);
+                        NotableUnitInternalPriority[Index] = MiscData.FirstStagePriority;
+                    }
+                    else
+                    {
+                        Logger.LogInfo("Reloading notable units");
+                        for (int i = 0; i < NotableUnits.Count; i++)
+                        {
+                            if (NotableUnitInternalPriority[i] == LowestPriority)
+                            {
+                                NotableUnitInternalPriority[i] = -LowestPriority;//this resets it and puts it back into the calling list
+                            }
+                        }
+                    }
                 }
             }
         }
-        
+
+        Logger.LogInfo("[ALL ITEMS:]");
+        for(int i = 0; i < NotableUnits.Count; i++)
+        {
+            Logger.LogInfo(NotableUnits[i] + " |:| " + NotableUnitInternalPriority[i]);
+        }
+        Logger.LogInfo("[END OF NOTABLE UNITS LIST]");
+
     }
     public int GetHighestBasePriority()
     {
@@ -473,25 +430,44 @@ public class Plugin : BaseUnityPlugin
 
     private void AddHazardNameOnlyToAudioList(Unit unit)
     {
-        Audio.AddToQueue(CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat).Value);
+        ConsiderInterrupt(unit);
+        Audio.AddToQueueLowPriority(CFG_HostilehazardsAudio.GetUnitAudio(unit, CFG_MinAirThreat).Value);
     }
     private void AddHazardBearingOnlyToAudioList(Unit unit)
     {
+        ConsiderInterrupt(unit);
         ConfigEntry<string>[] PositionAudio = CFG_PositionCalloutAudio.GetPositionAudioString(PlayerAircraft, unit.GlobalPosition());
         foreach (ConfigEntry<string> s in PositionAudio)
         {
-            Audio.AddToQueue(s.Value);
+            Audio.AddToQueueLowPriority(s.Value);
         }
     }
     private void AddHazardAdviceOnlyToAudioList(Unit unit)
     {
+        ConsiderInterrupt(unit);
         ConfigEntry<string> Advice = CFG_InstructionHazardAudio.GetMissileResponseAudio(unit, PlayerAircraft);
         if(Advice != null)
         {
-            Audio.AddToQueue(Advice.Value);
+            Audio.AddToQueueLowPriority(Advice.Value);
         }
     }
-
+    public void ConsiderInterrupt(Unit unit)
+    {
+        int CurrentPriority = GetBasePriority(unit);
+        if (CurrentPriority != BasePriorityOfLastPlayed)
+        {
+            Logger.LogInfo("Clearing Low Priority Queue");
+            Audio.ClearQueueLowPriority();
+            for (int i = 0; i < NotableUnits.Count; i++)
+            {
+                if (NotableUnitInternalPriority[i] == MiscData.FirstStagePriority || NotableUnitInternalPriority[i] == MiscData.SecondStagePriority)
+                {
+                    NotableUnitInternalPriority[i] = GetBasePriority(NotableUnits[i]);
+                }
+            }
+        }
+        BasePriorityOfLastPlayed = CurrentPriority;
+    }
     
     private int GetBasePriority(Unit unit)
     {
@@ -501,12 +477,17 @@ public class Plugin : BaseUnityPlugin
     }
     public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
     {
-
+        Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
         if (LockedOverride)
         {
             return true;
         }
-        CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false);
+
+        if(CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false))
+        {
+            Logger.LogInfo("Fail due to unit not being valid in config");
+            return false;
+        }
 
         
 
@@ -551,6 +532,7 @@ public class Plugin : BaseUnityPlugin
                     return false;
                 }
 
+                Logger.LogInfo(AAthreat + ":" + CFG_MinAirThreat.Value);
                 return (AAthreat > CFG_MinAirThreat.Value);
             }
         }

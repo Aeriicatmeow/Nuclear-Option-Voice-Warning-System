@@ -26,7 +26,9 @@ namespace Lock_Shoot_Tone_Ping
         public static string NoAudio = ":[NONE]:";
 
         private Dictionary<string, AudioClip> AudioDictionary;
+
         private Queue<AudioClip> AudioQueue;
+        private Queue<AudioClip> LowPriorityQueue;
 
         //private float DefaultPitch;
         public AudioHandler(GameObject Host, ConfigEntry<int> Volume_Percent, string Root)
@@ -56,6 +58,7 @@ namespace Lock_Shoot_Tone_Ping
                 AudioDictionary.TryAdd(a.name, a);
             }
             AudioQueue = new Queue<AudioClip>();
+            LowPriorityQueue = new Queue<AudioClip>();
         }
 
         #region AudioPlaying
@@ -344,6 +347,7 @@ namespace Lock_Shoot_Tone_Ping
         //    };
         //}
         #endregion
+
         #region AudioQueue
         public void Update()
         {
@@ -355,11 +359,20 @@ namespace Lock_Shoot_Tone_Ping
                     CurrentAudio = AudioQueue.Dequeue();
                 }
                 PlayAudio(CurrentAudio,true);
+
+            }
+            if (AudioQueue.Count == 0)
+            {
+                AudioQueue.Enqueue(LowPriorityQueue.Dequeue());
             }
         }
         public void AddToQueue(string Name)
         {
             AudioQueue.Enqueue(Search(Name));
+        }
+        public void AddToQueueLowPriority(string Name)
+        {
+            LowPriorityQueue.Enqueue(Search(Name));
         }
         public void AddToQueueNoDuplicates(string Name)
         {
@@ -369,16 +382,39 @@ namespace Lock_Shoot_Tone_Ping
                 AddToQueue(Audio);
             }
         }
+        public void AddToQueueNoDuplicatesLowPriority(string Name)
+        {
+            AudioClip Audio = Search(Name);
+            if (!LowPriorityQueue.Contains(Audio))
+            {
+                AddToQueueLowPriority(Audio);
+            }
+        }
         public void AddToQueue(AudioClip Audio)
         {
             AudioQueue.Enqueue(Audio);
+        }
+        public void AddToQueueLowPriority(AudioClip Audio)
+        {
+            LowPriorityQueue.Enqueue(Audio);
         }
         public void ClearQueue()
         {
             AudioQueue.Clear();
         }
+        public void ClearQueueLowPriority()
+        {
+            LowPriorityQueue.Clear();
+        }
+        public void ClearAllQueues()
+        {
+            ClearQueue();
+            ClearQueueLowPriority();
+        }
         public Queue<AudioClip> GetQueue() => AudioQueue;
+        public Queue<AudioClip> GetLowPriorityQueue() => LowPriorityQueue;
         public int GetQueueLength() => AudioQueue.Count;
+        public int GetQueueLengthLowPriority() => LowPriorityQueue.Count;
         public bool CheckIfQueueContains(string AudioName)
         {
             foreach (AudioClip a in AudioQueue)
