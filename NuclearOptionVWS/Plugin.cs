@@ -44,6 +44,7 @@ public class Plugin : BaseUnityPlugin
 
     bool NullPosition;
 
+    ConfigEntry<bool> CFG_Enabled;
     ConfigEntry<int> CFG_Volume_Percent;
     ConfigEntry<string> CFG_EncodingType;
 
@@ -81,7 +82,7 @@ public class Plugin : BaseUnityPlugin
         I = this;
         Logger = base.Logger;
 
-
+        CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 100)));
         //CFG_MinimunDelayBetweenWarnings = Config.Bind("General", "MinimunDelayBeforeWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
 
@@ -198,7 +199,7 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
 
-        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null)
+        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null&CFG_Enabled.Value)
         {
             NullPosition = false;
             PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
