@@ -351,6 +351,10 @@ namespace Lock_Shoot_Tone_Ping
         #region AudioQueue
         public void Update()
         {
+            if (AudioQueue.Count == 0 & LowPriorityQueue.Count>0)
+            {
+                AudioQueue.Enqueue(LowPriorityQueue.Dequeue());
+            }
             if (!Source.isPlaying & AudioQueue.Count > 0)
             {
                 AudioClip CurrentAudio = null;
@@ -361,10 +365,7 @@ namespace Lock_Shoot_Tone_Ping
                 PlayAudio(CurrentAudio,true);
 
             }
-            if (AudioQueue.Count == 0)
-            {
-                AudioQueue.Enqueue(LowPriorityQueue.Dequeue());
-            }
+
         }
         public void AddToQueue(string Name)
         {
@@ -415,6 +416,7 @@ namespace Lock_Shoot_Tone_Ping
         public Queue<AudioClip> GetLowPriorityQueue() => LowPriorityQueue;
         public int GetQueueLength() => AudioQueue.Count;
         public int GetQueueLengthLowPriority() => LowPriorityQueue.Count;
+        public int GetTotalQueueLength() => LowPriorityQueue.Count + AudioQueue.Count;
         public bool CheckIfQueueContains(string AudioName)
         {
             foreach (AudioClip a in AudioQueue)

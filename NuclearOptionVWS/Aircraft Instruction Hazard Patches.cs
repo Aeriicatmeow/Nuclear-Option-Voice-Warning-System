@@ -23,6 +23,14 @@ namespace NuclearOptionVWS
             Plugin.I.TriggerAoACheck(___hornThreshold,___velocityThreshold);
         }
     }
+    [HarmonyPatch(typeof(Aircraft),nameof(Aircraft.Refuel))]
+    internal static class RefuelPatch
+    {
+        static void Postfix(Aircraft __instance)
+        {
+            Plugin.I.TriggerRefuelCheck(__instance);
+        }
+    }
 
 
 }

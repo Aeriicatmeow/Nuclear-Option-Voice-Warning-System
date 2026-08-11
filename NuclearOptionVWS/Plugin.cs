@@ -65,6 +65,7 @@ public class Plugin : BaseUnityPlugin
 
     List<Unit> NotableUnits;
     List<double> NotableUnitInternalPriority;
+    List<float> NotableUnitTimeOfLastPing;
     int BasePriorityOfLastPlayed;
 
 
@@ -119,6 +120,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Initialising List Of Warnings");
         NotableUnits = new List<Unit>();
         NotableUnitInternalPriority = new List<double>();
+        NotableUnitTimeOfLastPing = new List<float>();
         BasePriorityOfLastPlayed = 0;
 
         Logger.LogInfo("Generating CFG Dictionary");
@@ -205,6 +207,7 @@ public class Plugin : BaseUnityPlugin
             try
             {
                 Audio.Update();
+                CFG_InstructionHazardAudio.InstructionOnUpdate(PlayerAircraft);
             }
             catch (Exception EXP)
             {
@@ -225,9 +228,22 @@ public class Plugin : BaseUnityPlugin
             try
             {
                 Logger.LogInfo("Instructions");
-                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this);
+                //if (CFG_InstructionHazardAudio.CheckIfAnInstructionComplaintShouldBeIssued())
+                //{
+                //    NotableUnits.Add(PlayerAircraft);
+                //    NotableUnitInternalPriority.Add(CFG_InstructionHazardAudio.GetInstructionHazardPriority());
+                //}
+                bool CTP;
+                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this,out CTP);
                 Logger.LogInfo("Hazards");
-                UpdateNotableUnits();
+                if (CTP)
+                {
+                    UpdateNotableUnits();
+                }
+                else
+                {
+                    Logger.LogInfo("InstructionWarnings have taken priority");
+                }
             }
             catch (Exception EXP)
             {
@@ -263,11 +279,18 @@ public class Plugin : BaseUnityPlugin
                 {
 
                     Logger.LogInfo(unit.Identity + "Is Valid");
-                    if (!NotableUnits.Contains(unit))
+                    int index = NotableUnits.IndexOf(unit);
+                    if (index == -1)
                     {
                         Logger.LogInfo("Adding Unit");
                         NotableUnits.Add(unit);
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
+                        NotableUnitTimeOfLastPing.Add(Time.timeSinceLevelLoad);
+
+                    }
+                    else
+                    {
+                        NotableUnitTimeOfLastPing[index] = Time.timeSinceLevelLoad;
                     }
                 }
             }
@@ -279,7 +302,7 @@ public class Plugin : BaseUnityPlugin
     }
     private void UpdateNotableUnits()
     {
-        if(Audio.GetQueueLengthLowPriority() > 0)
+        if(Audio.GetTotalQueueLength() > 0)
         {
             Logger.LogInfo("Returning notable unit update as the audio queue is occupied");
             return;
@@ -299,29 +322,40 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Cull Section");
         while (Index < NotableUnits.Count)
         {
-
+            bool ClearToProceed = true;
             if (NotableUnits[Index].NetId == 0)
             {
                 Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to NetID of 0 (unit nolonger exists)");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                ClearToProceed = false;
             }
-
+            if (Time.timeSinceLevelLoad - NotableUnitTimeOfLastPing[Index] > 1)
+            {
+                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to time out exception");
+                NotableUnits.RemoveAt(Index);
+                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                ClearToProceed = false;
+            }
             if (!CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
             {
                 Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to unit threat nolonger being valid");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                ClearToProceed = false;
             }
-            else
-            {
 
+            if (ClearToProceed)
+            {
                 if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority)//If its negetive, its already been called out.
-                                                                                                                //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
-                                                                                                                //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
-                                                                                                                //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
-                                                                                                                //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
-                                                                                                                //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
+                                                                                                                                                           //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
+                                                                                                                                                           //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
+                                                                                                                                                           //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
+                                                                                                                                                           //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
+                                                                                                                                                           //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
                 {
                     if (NotableUnitInternalPriority[Index] > 0)
                     {
@@ -341,11 +375,11 @@ public class Plugin : BaseUnityPlugin
 
                 }
 
-
+            }
                 
 
-                Index++;
-            }
+            Index++;
+            
 
         }
 
@@ -451,12 +485,26 @@ public class Plugin : BaseUnityPlugin
             Audio.AddToQueueLowPriority(Advice.Value);
         }
     }
-    public void ConsiderInterrupt(Unit unit)
+    public bool LastHadPriortyOverride = false;
+    public void ConsiderInterrupt(Unit unit,int PriorityOverride = -1, bool ForceClearRegardless = false)
     {
-        int CurrentPriority = GetBasePriority(unit);
-        if (CurrentPriority != BasePriorityOfLastPlayed)
+        int CurrentPriority;
+        if (PriorityOverride != -1)
+        {
+            CurrentPriority = PriorityOverride;
+            LastHadPriortyOverride = true;
+        }
+        else
+        {
+            CurrentPriority = GetBasePriority(unit);
+            LastHadPriortyOverride = false;
+        }
+        if (CurrentPriority != BasePriorityOfLastPlayed || ForceClearRegardless)
         {
             Logger.LogInfo("Clearing Low Priority Queue");
+
+            CFG_InstructionHazardAudio.ResetAltitudeComplaintStatus();
+
             Audio.ClearQueueLowPriority();
             for (int i = 0; i < NotableUnits.Count; i++)
             {
@@ -478,7 +526,7 @@ public class Plugin : BaseUnityPlugin
     public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
     {
         Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
-        if (LockedOverride)
+        if (LockedOverride & unit.definition.typeIdentity.missile >= 0.5)
         {
             return true;
         }
@@ -565,10 +613,10 @@ public class Plugin : BaseUnityPlugin
             {
                 CFG_InstructionHazardAudio.CheckBINGOWarning(PlayerAircraft, FuelUsedOnTick, Audio);
             }
-            else
-            {
-                Logger.LogInfo("Aircraft decided that this was not player aircraft");
-            }
+            //else
+            //{
+            //    Logger.LogInfo("Aircraft decided that this was not player aircraft");
+            //}
         }
         catch(Exception EXP)
         {
@@ -587,6 +635,24 @@ public class Plugin : BaseUnityPlugin
             {
                 Logger.LogFatal(EXP);
             }
+        }
+    }
+    public void TriggerRefuelCheck(Aircraft AircraftConcerned)
+    {
+        try
+        {
+            if (AircraftConcerned == PlayerAircraft)
+            {
+                CFG_InstructionHazardAudio.ResetFuelWarningStates();
+            }
+            //else
+            //{
+            //    Logger.LogInfo("Aircraft decided that this was not player aircraft");
+            //}
+        }
+        catch (Exception EXP)
+        {
+            Logger.LogFatal(EXP);
         }
     }
     #endregion

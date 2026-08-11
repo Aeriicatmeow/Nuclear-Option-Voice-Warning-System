@@ -445,8 +445,20 @@ namespace NuclearOptionVWS
         private bool DangerCloseFired = true;
         private bool FlaresLowFired = true;
         private bool CapacitorLowFired = true;
-        public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin)
+
+        private bool InSecondStageOfAltitudeComplaint = false;
+        public void ResetAltitudeComplaintStatus()
         {
+            InSecondStageOfAltitudeComplaint = false;
+        }
+        public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin, out bool ClearToProceed)
+        {
+
+            Plugin.I.Log(LogLevel.Info, "Instrucion Hazards");
+            Plugin.I.Log(LogLevel.Info, "AoA: " + DangerousAoA);
+            Plugin.I.Log(LogLevel.Info, "GForce: " + DangerousGForce);
+            Plugin.I.Log(LogLevel.Info, "Altitude: " + FatalTrajectory);
+
             int Priority = CFG_InstructionHazardPriority.Value;
 
             float Alt = PlayerAircraft.radarAlt;
@@ -457,61 +469,105 @@ namespace NuclearOptionVWS
             float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
 
             float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
-                                                                                                    //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
+                                                                                                  //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
 
-            if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
+            bool InstructionHierarchyCheck = false;
+
+            if (Audio.GetTotalQueueLength() == 0)
             {
-                ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
-                if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
+                //AoA
+                if ((Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value) & (DangerousAoA || FatalAoA))
                 {
-                    FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
+                    InstructionHierarchyCheck = true;
+                    ResetAltitudeComplaintStatus();
+                    Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
+                    Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("AoA").Value);
                 }
-                else
+                //OverG
+                if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value & !InstructionHierarchyCheck)
                 {
-                    FatalTrajectory = true;
-                    AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
-                }
-
-
-                if (Math.Abs(BankAngle) > 60)
-                {
-                    if (BankAngle < 0)
+                    if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
+                        DangerousGForce = true;
+                        InstructionHierarchyCheck = true;
+                        ResetAltitudeComplaintStatus();
+                        Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
+                        Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
                     }
                     else
                     {
-                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
+                        DangerousGForce = false;
+                    }
+                }
+
+                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed & !InstructionHierarchyCheck & PlayerAircraft.speed > 10)
+                {
+                    ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
+                    if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
+                    {
+                        FatalTrajectory = true;
+                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Critical Altitude");
+                    }
+                    else
+                    {
+                        FatalTrajectory = true;
+                        AltitudeWarningLine[0] = CFG_InstructionHazards.Get("Altitude");
+                    }
+
+
+                    if (Math.Abs(BankAngle) > 60)
+                    {
+                        if (BankAngle < 0)
+                        {
+                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Left");
+                        }
+                        else
+                        {
+                            AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Roll Right");
+                        }
+                    }
+                    else
+                    {
+                        AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
+                    }
+
+                    if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
+                    {
+                        InstructionHierarchyCheck = true;
+                        bool tmp = InSecondStageOfAltitudeComplaint;
+                        Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority, true);
+                        InSecondStageOfAltitudeComplaint = tmp;
+                        if (!InSecondStageOfAltitudeComplaint)
+                        {
+                            Audio.AddToQueueNoDuplicates(AltitudeWarningLine[0].Value);
+                        }
+                        else
+                        {
+                            Audio.AddToQueueNoDuplicates(AltitudeWarningLine[1].Value);
+                        }
+                        InSecondStageOfAltitudeComplaint = !InSecondStageOfAltitudeComplaint;
+                        //foreach (ConfigEntry<string> s in AltitudeWarningLine)
+                        //{
+                        //    Audio.AddToQueueNoDuplicatesLowPriority(s.Value);
+                        //}
                     }
                 }
                 else
                 {
-                    AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
-                }
-
-                if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
-                {
-                    Plugin.I.ConsiderInterrupt(PlayerAircraft);
-                    foreach (ConfigEntry<string> s in AltitudeWarningLine)
+                    FatalTrajectory = false;
+                    if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed)
                     {
-                        Audio.AddToQueueNoDuplicatesLowPriority(s.Value);
+                        ResetAltitudeComplaintStatus();
                     }
                 }
-            }
-            else
-            {
-                FatalTrajectory = false;
-            }
 
-            //OverG
-            if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
-            {
-                if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
+                if (!InstructionHierarchyCheck & Plugin.I.LastHadPriortyOverride)
                 {
-                    Plugin.I.ConsiderInterrupt(PlayerAircraft);
-                    Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
+                    Plugin.I.Log(LogLevel.Info, "Clearing low priorty due to instructions nolonger being used");
+                    Audio.ClearQueueLowPriority();
+                    ResetAltitudeComplaintStatus();
                 }
+
             }
             //one off things will be injected directly into the audio handler so they cannot be ignored
 
@@ -562,11 +618,15 @@ namespace NuclearOptionVWS
             {
                 Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value);
             }
+
+            ClearToProceed = !InstructionHierarchyCheck;
         }
 
 
         private bool FatalAoA = false;
+        private bool DangerousAoA = false;
         private bool FatalTrajectory = false;
+        private bool DangerousGForce = false;
         Queue<PilotHealthSnapshot> PilotHealthTrend;
 
         private struct PilotHealthSnapshot
@@ -619,7 +679,11 @@ namespace NuclearOptionVWS
             CapacitorLowFired = true;
 
             FatalAoA = false;
+            DangerousAoA = false;
             FatalTrajectory = false;
+            DangerousGForce = false;
+
+            InSecondStageOfAltitudeComplaint = false;
         }
 
         private double TotalFuelUsed = 0;//Must be double due to how large the numbers will become over run time.
@@ -717,16 +781,22 @@ namespace NuclearOptionVWS
             float num = Mathf.Atan2(vector.y, vector.z) * -57.29578f;
             Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f)
-            { 
-                Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("AoA").Value);
+            {
+                DangerousAoA = true;
+                //Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("AoA").Value);
                 if (num > StallHornThreshold)
                 {
                     FatalAoA = true;
+                }
+                else
+                {
+                    FatalAoA = false;
                 }
             }
             else
             {
                 FatalAoA = false;
+                DangerousAoA = false;
             }
         }
         public ConfigEntry<string> GetMissileResponseAudio(Unit unit, Aircraft PlayerAircraft)
@@ -790,6 +860,30 @@ namespace NuclearOptionVWS
                 EPH.AddToDictionary(c);
             }
             EPH.AddToDictionary(CFG_AudioOut);
+        }
+
+        public bool CheckIfAnInstructionComplaintShouldBeIssued()
+        {
+            return (DangerousGForce || DangerousAoA || FatalTrajectory);
+        }
+        public bool CheckIfInstructionComplaintIsValid(Unit unit, Aircraft PlayerAircraft)
+        {
+            if(unit == PlayerAircraft)
+            {
+                return CheckIfAnInstructionComplaintShouldBeIssued();
+            }
+            return false;
+        }
+        public int GetInstructionHazardPriority() => CFG_InstructionHazardPriority.Value;
+
+        private bool OnUpdateFuelReset = false;
+        public void InstructionOnUpdate(Aircraft PlayerAircraft)
+        {
+            if(PlayerAircraft.GetInputs().throttle < 1 & PlayerAircraft.radarAlt < 0.2 & PlayerAircraft.speed < 1)//Basically, if most likely stationary. this could be triggered in very neiche cases with the chicaine but its a risk im willing to take
+            {
+                ResetBINGOData();
+                OnUpdateFuelReset = true;
+            }
         }
     }
 
