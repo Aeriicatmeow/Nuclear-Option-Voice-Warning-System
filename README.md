@@ -238,6 +238,7 @@ Again, I have example configs for you to download so you can edit those if you p
 ## Final Notes
 
 Please note that this README is up to date with version 1.0.0
+
 If I have forgotten to update the README for the current version, tell me. 
 
 The development of this mod took longer than i expected (over a month in total) due to update 0.34 forcing me to check back over my code as well as the NOMM registry being locked down due to the QoL mod drama.
