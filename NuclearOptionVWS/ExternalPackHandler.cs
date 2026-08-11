@@ -39,7 +39,7 @@ namespace Lock_Shoot_Tone_Ping
             DictionaryOfAllSaveableConfigs = new Dictionary<string, ConfigEntryBase>();
 
             MainPlugin = Plugin;
-            string[] EncodingTypes = { "Raw", "Streamlined", "Simplified" };
+            string[] EncodingTypes = { "Raw", "Streamlined"};
             EncodingType = MainPlugin.Config.Bind("External Packs", "PackConfigEncoding", "Streamlined", new ConfigDescription("What Pack Encoding Type do you want to save the current configs as (change will occur when you close the game or when you change active pack)", new AcceptableValueList<string>(EncodingTypes)));
             CFG_WipeEmptyConfigs = MainPlugin.Config.Bind("External Packs", "Wipe undefined fields", false, "If selected, undefined values in a pack config will not wipe old config values");
             this.CFG_EncodingType = EncodingType;
