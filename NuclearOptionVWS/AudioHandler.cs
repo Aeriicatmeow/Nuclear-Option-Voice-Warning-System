@@ -123,7 +123,7 @@ namespace Lock_Shoot_Tone_Ping
             {
                 if (Audio != null)
                 {
-                    Plugin.I.Log(LogLevel.Info, "Attempting to play " + Audio.name);
+                    //Plugin.I.Log(LogLevel.Info, "Attempting to play " + Audio.name);
                     if (Audio != Source.clip && Source.isPlaying)
                     {
                         Stop();

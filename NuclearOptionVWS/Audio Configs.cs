@@ -410,7 +410,7 @@ namespace NuclearOptionVWS
                     new ConfigDescription(HazardDescriptions[i], new AcceptableValueList<string>(ArrayOfAllAudio)));
             }
 
-            CFG_InstructMissileCounterMeasures = plugin.Config.Bind(Category, "Instruct on countermeasures", false, "If Enabled, All missile warnings will be appended with some instructions on how to counter them");
+            CFG_InstructMissileCounterMeasures = plugin.Config.Bind(Category, "Instruct on countermeasures", true, "If Enabled, All missile warnings will be appended with some instructions on how to counter them");
 
             const string HazardSettings = "Instruction Hazards Settings";
             plugin.Log(LogLevel.Info, "OUT");
@@ -454,10 +454,10 @@ namespace NuclearOptionVWS
         public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin, out bool ClearToProceed)
         {
 
-            Plugin.I.Log(LogLevel.Info, "Instrucion Hazards");
-            Plugin.I.Log(LogLevel.Info, "AoA: " + DangerousAoA);
-            Plugin.I.Log(LogLevel.Info, "GForce: " + DangerousGForce);
-            Plugin.I.Log(LogLevel.Info, "Altitude: " + FatalTrajectory);
+            //Plugin.I.Log(LogLevel.Info, "Instrucion Hazards");
+            //Plugin.I.Log(LogLevel.Info, "AoA: " + DangerousAoA);
+            //Plugin.I.Log(LogLevel.Info, "GForce: " + DangerousGForce);
+            //Plugin.I.Log(LogLevel.Info, "Altitude: " + FatalTrajectory);
 
             int Priority = CFG_InstructionHazardPriority.Value;
 
@@ -563,7 +563,7 @@ namespace NuclearOptionVWS
 
                 if (!InstructionHierarchyCheck & Plugin.I.LastHadPriortyOverride)
                 {
-                    Plugin.I.Log(LogLevel.Info, "Clearing low priorty due to instructions nolonger being used");
+                    //Plugin.I.Log(LogLevel.Info, "Clearing low priorty due to instructions nolonger being used");
                     Audio.ClearQueueLowPriority();
                     ResetAltitudeComplaintStatus();
                 }
@@ -591,7 +591,7 @@ namespace NuclearOptionVWS
             else if (!FlaresLowFired & PlayerAircraft.countermeasureManager.GetActiveCountermeasure().chargeable == false)
             {
                 FlaresLowFired = true;
-                Plugin.I.Log(LogLevel.Info, "LowFlares");
+                //Plugin.I.Log(LogLevel.Info, "LowFlares");
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Flare").Value);
                 Audio.AddToQueue(CFG_AudioOut.Value);
             }
@@ -714,13 +714,13 @@ namespace NuclearOptionVWS
             if (Aircraft.speed >= Aircraft.GetAircraftParameters().takeoffSpeed & BINGOTriggered == false)
             {
                 TotalSummedSpeed += Aircraft.speed;
-                Plugin.I.Log(LogLevel.Info, Aircraft.speed);
+                //Plugin.I.Log(LogLevel.Info, Aircraft.speed);
                 TotalFuelUsed += FuelUsedOnTick;
                 TotalEvaluations++;
-                Plugin.I.Log(LogLevel.Info, "TotalEval: " + TotalEvaluations);
+                //Plugin.I.Log(LogLevel.Info, "TotalEval: " + TotalEvaluations);
 
                 int NumberOfAircraftEngines = Aircraft.engineStates.Count;
-                Plugin.I.Log(LogLevel.Info, "EngineNum: " + NumberOfAircraftEngines);
+                //Plugin.I.Log(LogLevel.Info, "EngineNum: " + NumberOfAircraftEngines);
                 if (NumberOfAircraftEngines < 1)
                 {
                     return;
@@ -753,10 +753,10 @@ namespace NuclearOptionVWS
                             BINGOTriggered = true;
                         }
 
-                        Plugin.I.Log(LogLevel.Info, "AVG FUEL OUT: " + AVGFuelConsumption);
-                        Plugin.I.Log(LogLevel.Info, "AVG SPEED: " + AVGSpeed);
-                        Plugin.I.Log(LogLevel.Info, "SECONDS TO RTB: " + SecondsToRTB);
-                        Plugin.I.Log(LogLevel.Info, "FUEL LEFT: " + Aircraft.GetFuelQuantity());
+                        //Plugin.I.Log(LogLevel.Info, "AVG FUEL OUT: " + AVGFuelConsumption);
+                        //Plugin.I.Log(LogLevel.Info, "AVG SPEED: " + AVGSpeed);
+                        //Plugin.I.Log(LogLevel.Info, "SECONDS TO RTB: " + SecondsToRTB);
+                        //Plugin.I.Log(LogLevel.Info, "FUEL LEFT: " + Aircraft.GetFuelQuantity());
                     }
                 }
             }
@@ -779,7 +779,7 @@ namespace NuclearOptionVWS
             //AoA warning
             Vector3 vector = Aircraft.cockpit.transform.InverseTransformDirection(Aircraft.cockpit.rb.velocity);
             float num = Mathf.Atan2(vector.y, vector.z) * -57.29578f;
-            Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
+           // Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
             if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f)
             {
                 DangerousAoA = true;
@@ -820,7 +820,7 @@ namespace NuclearOptionVWS
                 }
                 else
                 {
-                    Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
+                    //Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
                     if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
                     {
                         EndInstruction = "Flare";

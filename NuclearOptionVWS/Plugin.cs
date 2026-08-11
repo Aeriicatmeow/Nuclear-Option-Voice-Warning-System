@@ -137,6 +137,8 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Initialising HarmonyX");
         Inj_Harmony = new Harmony($"com.Aeriicatmeow.{FileModName}");
         Inj_Harmony.PatchAll();
+        Logger.LogInfo("Updating Active Pack");
+        PackHandler.UpdateActivePack();
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
     }
     private bool VerifyFileStructure(ref string Root)
@@ -187,7 +189,7 @@ public class Plugin : BaseUnityPlugin
     }
     private void Update()
     {
-        Logger.LogInfo("UPDATE");
+        //Logger.LogInfo("UPDATE");
         try
         {
             PackHandler.UpdateActivePack();
@@ -223,10 +225,10 @@ public class Plugin : BaseUnityPlugin
 
         if (!NullPosition)
         {
-            Logger.LogInfo("Main Update Loop");
+            //Logger.LogInfo("Main Update Loop");
             try
             {
-                Logger.LogInfo("Instructions");
+                //Logger.LogInfo("Instructions");
                 //if (CFG_InstructionHazardAudio.CheckIfAnInstructionComplaintShouldBeIssued())
                 //{
                 //    NotableUnits.Add(PlayerAircraft);
@@ -234,14 +236,14 @@ public class Plugin : BaseUnityPlugin
                 //}
                 bool CTP;
                 CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this,out CTP);
-                Logger.LogInfo("Hazards");
+                //Logger.LogInfo("Hazards");
                 if (CTP)
                 {
                     UpdateNotableUnits();
                 }
                 else
                 {
-                    Logger.LogInfo("InstructionWarnings have taken priority");
+                    //Logger.LogInfo("InstructionWarnings have taken priority");
                 }
             }
             catch (Exception EXP)
@@ -257,7 +259,7 @@ public class Plugin : BaseUnityPlugin
     {
         //Logger.LogInfo("MapIcon Request recieved");
         //Logger.LogInfo(NullPosition);
-        Logger.LogInfo(unit.Identity);
+        //Logger.LogInfo(unit.Identity);
         try
         {
             //Logger.LogInfo(PlayerAircraft.NetworkHQ);
@@ -271,17 +273,17 @@ public class Plugin : BaseUnityPlugin
                 {
                     IsLocked = InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft);
                 }
-                Logger.LogInfo("1st calling cull");
+                //Logger.LogInfo("1st calling cull");
 
 
                 if (CheckIfValidForCallout(unit,IsLocked)) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
                 {
 
-                    Logger.LogInfo(unit.Identity + "Is Valid");
+                    //Logger.LogInfo(unit.Identity + "Is Valid");
                     int index = NotableUnits.IndexOf(unit);
                     if (index == -1)
                     {
-                        Logger.LogInfo("Adding Unit");
+                        //Logger.LogInfo("Adding Unit");
                         NotableUnits.Add(unit);
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
                         NotableUnitTimeOfLastPing.Add(Time.timeSinceLevelLoad);
@@ -303,12 +305,12 @@ public class Plugin : BaseUnityPlugin
     {
         if(Audio.GetTotalQueueLength() > 0)
         {
-            Logger.LogInfo("Returning notable unit update as the audio queue is occupied");
+            //Logger.LogInfo("Returning notable unit update as the audio queue is occupied");
             return;
         }
         if(NotableUnits.Count == 0)
         {
-            Logger.LogInfo("Returning notable unit update as there are no notable units in list");
+            //Logger.LogInfo("Returning notable unit update as there are no notable units in list");
             return;
         }
 
@@ -318,29 +320,29 @@ public class Plugin : BaseUnityPlugin
 
         double HighestPriority = int.MinValue;
         double LowestPriority = int.MaxValue;
-        Logger.LogInfo("Cull Section");
+        //Logger.LogInfo("Cull Section");
         while (Index < NotableUnits.Count)
         {
             bool ClearToProceed = true;
             if (NotableUnits[Index].NetId == 0)
             {
-                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to NetID of 0 (unit nolonger exists)");
+                //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to NetID of 0 (unit nolonger exists)");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
                 NotableUnitTimeOfLastPing.RemoveAt(Index);
                 ClearToProceed = false;
             }
-            if (Time.timeSinceLevelLoad - NotableUnitTimeOfLastPing[Index] > 1)
+            else if (Time.timeSinceLevelLoad - NotableUnitTimeOfLastPing[Index] > 1)
             {
-                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to time out exception");
+                //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to time out exception");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
                 NotableUnitTimeOfLastPing.RemoveAt(Index);
                 ClearToProceed = false;
             }
-            if (!CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
+            else if (!CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
             {
-                Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to unit threat nolonger being valid");
+                //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to unit threat nolonger being valid");
                 NotableUnits.RemoveAt(Index);
                 NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
                 NotableUnitTimeOfLastPing.RemoveAt(Index);
@@ -373,24 +375,29 @@ public class Plugin : BaseUnityPlugin
                     }
 
                 }
+                Index++;
 
             }
                 
 
-            Index++;
+
             
 
         }
+        if(NotableUnits.Count == 0)
+        {
+            return;
+        }
 
-        Logger.LogInfo("Execute Section");
-        Logger.LogInfo("HI: " + HighestPriority);
-        Logger.LogInfo("LO: " + LowestPriority);
+        //Logger.LogInfo("Execute Section");
+        //Logger.LogInfo("HI: " + HighestPriority);
+        //Logger.LogInfo("LO: " + LowestPriority);
 
         Index = NotableUnitInternalPriority.IndexOf(MiscData.SecondStagePriority);
         if (Index != -1)
         {
             //
-            Logger.LogInfo("Continuing a Missile Hazard. Specify Counterplay");
+            //Logger.LogInfo("Continuing a Missile Hazard. Specify Counterplay");
             AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
             NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
         }
@@ -401,7 +408,7 @@ public class Plugin : BaseUnityPlugin
             if (Index != -1)
             {
                 //
-                Logger.LogInfo("Second stage of audio hazard playing - specify bearing");
+                //Logger.LogInfo("Second stage of audio hazard playing - specify bearing");
                 AddHazardBearingOnlyToAudioList(NotableUnits[Index]);
                 if (CFG_InstructionHazardAudio.CheckIfResponseIsNeeded(NotableUnits[Index], PlayerAircraft))
                 {
@@ -420,13 +427,13 @@ public class Plugin : BaseUnityPlugin
                     if (HighestPriority >= -LowestPriority || LowestPriority > 0)
                     {
                         //
-                        Logger.LogInfo("First stage of audio playing. Specifying hazard");
+                        //Logger.LogInfo("First stage of audio playing. Specifying hazard");
                         AddHazardNameOnlyToAudioList(NotableUnits[Index]);
                         NotableUnitInternalPriority[Index] = MiscData.FirstStagePriority;
                     }
                     else
                     {
-                        Logger.LogInfo("Reloading notable units");
+                        //Logger.LogInfo("Reloading notable units");
                         for (int i = 0; i < NotableUnits.Count; i++)
                         {
                             if (NotableUnitInternalPriority[i] == LowestPriority)
@@ -439,12 +446,12 @@ public class Plugin : BaseUnityPlugin
             }
         }
 
-        Logger.LogInfo("[ALL ITEMS:]");
-        for(int i = 0; i < NotableUnits.Count; i++)
-        {
-            Logger.LogInfo(NotableUnits[i] + " |:| " + NotableUnitInternalPriority[i]);
-        }
-        Logger.LogInfo("[END OF NOTABLE UNITS LIST]");
+        //Logger.LogInfo("[ALL ITEMS:]");
+        //for(int i = 0; i < NotableUnits.Count; i++)
+        //{
+        //    Logger.LogInfo(NotableUnits[i] + " |:| " + NotableUnitInternalPriority[i]);
+        //}
+        //Logger.LogInfo("[END OF NOTABLE UNITS LIST]");
 
     }
     public int GetHighestBasePriority()
@@ -500,7 +507,7 @@ public class Plugin : BaseUnityPlugin
         }
         if (CurrentPriority != BasePriorityOfLastPlayed || ForceClearRegardless)
         {
-            Logger.LogInfo("Clearing Low Priority Queue");
+            //Logger.LogInfo("Clearing Low Priority Queue");
 
             CFG_InstructionHazardAudio.ResetAltitudeComplaintStatus();
 
@@ -524,7 +531,7 @@ public class Plugin : BaseUnityPlugin
     }
     public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
     {
-        Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
+        //Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
         if (LockedOverride & unit.definition.typeIdentity.missile >= 0.5)
         {
             return true;
@@ -532,7 +539,7 @@ public class Plugin : BaseUnityPlugin
 
         if(CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false))
         {
-            Logger.LogInfo("Fail due to unit not being valid in config");
+            //Logger.LogInfo("Fail due to unit not being valid in config");
             return false;
         }
 
@@ -548,7 +555,7 @@ public class Plugin : BaseUnityPlugin
 
         if (CFG_OnlyCallOutIfInLineOfSight.Value & !unit.LineOfSight(PlayerAircraft.GlobalPosition().AsVector3(), 100000f))
         {
-            Logger.LogInfo("Fail due to no line of sight");
+            //Logger.LogInfo("Fail due to no line of sight");
             return false;
         }
 
@@ -575,18 +582,18 @@ public class Plugin : BaseUnityPlugin
 
                 if(CFG_OnlyCallOutLockedAirMissiles.Value & unit.definition.typeIdentity.missile >= 0.5 & !InstructionHazard.CheckIfMissileLocked(unit,PlayerAircraft))
                 {
-                    Logger.LogInfo("Fail as Missile must be locked to not be ignored");
+                    //Logger.LogInfo("Fail as Missile must be locked to not be ignored");
                     return false;
                 }
 
-                Logger.LogInfo(AAthreat + ":" + CFG_MinAirThreat.Value);
+                //Logger.LogInfo(AAthreat + ":" + CFG_MinAirThreat.Value);
                 return (AAthreat > CFG_MinAirThreat.Value);
             }
         }
         else
         {
-            Logger.LogInfo("Fail as unit is out of range");
-            Logger.LogInfo(MaxConsiderationDistance);
+            //Logger.LogInfo("Fail as unit is out of range");
+            //Logger.LogInfo(MaxConsiderationDistance);
             return false;
         }
     }
@@ -608,7 +615,7 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            if (AircraftConcerned == PlayerAircraft)
+            if (AircraftConcerned == PlayerAircraft & !NullPosition)
             {
                 CFG_InstructionHazardAudio.CheckBINGOWarning(PlayerAircraft, FuelUsedOnTick, Audio);
             }
