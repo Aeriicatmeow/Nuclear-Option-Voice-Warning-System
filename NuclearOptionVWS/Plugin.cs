@@ -55,7 +55,6 @@ public class Plugin : BaseUnityPlugin
     public ConfigEntry<bool> CFG_OnlyCallOutLockedAirMissiles;
     ConfigEntry<bool> CFG_OnlyCallOutIfInLineOfSight;
     //ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
-    public ConfigEntry<bool> CFG_HighCautionMode;
 
     //AudioStorage
     BearingAudConfig CFG_PositionCalloutAudio;
@@ -92,7 +91,6 @@ public class Plugin : BaseUnityPlugin
         CFG_AlwaysCallOutAircraft = Config.Bind("VWS General", "Ignore Aircraft Capability", false, "If checked, all nearby enemy aircraft will be called out regardless of if their A2A capability");
         CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", true, "If checked, Only locked missiles will be called out");
         CFG_OnlyCallOutIfInLineOfSight = Config.Bind("VWS General", "Only Call Out If In Line Of Sight", true, "If Checked, Only hazards that are in line of sight of the aircraft will be called out");
-        CFG_HighCautionMode = Config.Bind("VWS General", "High Caution Mode", false, "If Enabled, mod will attempt to estimate if a missile is locked onto you ");
 
         string Root = Path.GetDirectoryName(Info.Location);
         DeletePluginDllOnClose = VerifyFileStructure(ref Root);
@@ -269,7 +267,7 @@ public class Plugin : BaseUnityPlugin
                 ||IsLocked) 
                 & !NullPosition)//If Enemy (or is locked onto you)
             {
-                if (!IsLocked & CFG_HighCautionMode.Value)
+                if (!IsLocked)
                 {
                     IsLocked = InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft);
                 }
