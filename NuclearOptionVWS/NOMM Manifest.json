@@ -1,0 +1,33 @@
+{
+  "id": "NuclearOptionVWS",
+  "displayName": "Nuclear Option VWS",
+  "description": "This mod expands on the voice warning system in the base game adding a variety of callouts for external hazards (such as enemy aircraft, missiles or ground units) and internal hazards (Such as altitude warnings, AoA and Gforce warnings as well as recommendation for ejection). Mod contains a pack handling system allowing for the quick import of audio and settings. Instructions on how to use mod are present in the README on Github.",
+  "tags": [
+    "Sound",
+    "QoL",
+    "Flavor"
+  ],
+  "urls": [
+    {
+      "name": "info",
+      "url": "https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System"
+    }
+  ],
+  "authors": [
+    "Aeriicatmeow"
+  ],
+  "githubOwner": "Aeriicatmeow",
+  "githubRepoName": "Nuclear-Option-Voice-Warning-System",
+  "autoUpdateArtifacts": "True",
+  "artifacts": [
+    {
+      "fileName": "NuclearOption-VWS.zip",
+      "version": "1.0.0",
+      "category": "Release",
+      "type": "plugin",
+      "gameVersion": "0.34",
+      "downloadUrl": "https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/NuclearOption-VWS.zip",
+      "hash": "sha256:41c19bc61c8fcfcbe50be7f7e6e449366884bd89f175812de6a172e6eb7330ac"
+    }
+  ]
+}
