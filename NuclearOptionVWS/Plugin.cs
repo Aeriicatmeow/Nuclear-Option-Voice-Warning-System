@@ -81,6 +81,9 @@ public class Plugin : BaseUnityPlugin
         I = this;
         Logger = base.Logger;
 
+        Logger.LogInfo("Please note, this version is intended for Nuclear Option 0.34");
+        Logger.LogInfo("Establishing core configs");
+
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 100)));
         //CFG_MinimunDelayBetweenWarnings = Config.Bind("General", "MinimunDelayBeforeWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
@@ -92,6 +95,7 @@ public class Plugin : BaseUnityPlugin
         CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", true, "If checked, Only locked missiles will be called out");
         CFG_OnlyCallOutIfInLineOfSight = Config.Bind("VWS General", "Only Call Out If In Line Of Sight", true, "If Checked, Only hazards that are in line of sight of the aircraft will be called out");
 
+        Logger.LogInfo("Verifying File Structure");
         string Root = Path.GetDirectoryName(Info.Location);
         DeletePluginDllOnClose = VerifyFileStructure(ref Root);
 
@@ -140,6 +144,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Updating Active Pack");
         PackHandler.UpdateActivePack();
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+        Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System. \nAlternately, please contact me on Dicord. \n Nuclear Option Official Discord Channel: [PLACEHOLDER] \n Primerva 2082 Channel: [PLACEHOLDER] \n Thankyou in advance.");
     }
     private bool VerifyFileStructure(ref string Root)
     {
