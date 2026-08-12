@@ -67,6 +67,7 @@ A unit will be considered to be high priority misc ground if it does not fulfill
 its AA threat > 0.5+(MinimunThreat)/2
 ```
 #### AIR HAZARDS
+Note: Enabling "Ignore Aircraft Capability" Will mean that all aircraft regardless of their theoretical Air to Air threat will be called out.
 ```
 Air - Audio to be played to alert you to usually the existence of enemy aircraft.
 Missile - Audio to be played to alert you to usually the existence of an enemy missile
