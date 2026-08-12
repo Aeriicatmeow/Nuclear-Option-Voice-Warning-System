@@ -1,0 +1,42 @@
+
+[Position Audio]
+12 OClock Audio=vws_ahead
+9 OClock Audio=vws_left
+6 OClock Audio=vws_behind
+3 OClock Audio=vws_right
+Low Audio=vws_low
+High Audio=vws_high
+
+[Instruction Hazards]
+OverG=vws_over_g
+Roll Right=vws_roll_right
+Roll Left=vws_roll_left
+AoA=vws_critical_angle
+Altitude=vws_altitude
+Critical Altitude=vws_critical_altitude
+Pull Up=vws_pull_up
+Dangerous Altitude=vws_dangerous_close
+Check Fuel=vws_check_fuel
+Low Fuel=vws_fuel_low
+Bingo Fuel=vws_bingo
+Eject=vws_eject
+
+[Counter Measure Instruction Hazards]
+Flare=vws_chaff_flare
+Decrease Throttle=vws_decrease_engine_rpm
+Jammer=vws_jammer
+Notch=vws_counter
+
+[Instruction Hazards Settings]
+Suffix Depleted=vws_chaff_flare_low
+
+[Ground Hazards]
+High Priotiy Misc Ground=vws_warning
+Low Priority Misc Ground=vws_caution
+Manpads=vws_attack_stinger
+SPAAG=vws_attack_gepard
+SAM=vws_attack_sam
+
+[Air Hazards]
+Air=vws_attack_air
+Missile=vws_missile
