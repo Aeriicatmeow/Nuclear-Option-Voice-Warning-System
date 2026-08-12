@@ -342,6 +342,7 @@ namespace NuclearOptionVWS
         public ConfigEntry<int> CFG_InstructionHazardPriority;
         public ConfigEntry<float> CFG_GForceTolerance;
         public ConfigEntry<bool> CFG_InstructMissileCounterMeasures;
+        public ConfigEntry<double> CFG_MinimunSustainedGForceTime;
 
         private Dictionary<string, ConfigEntry<string>> CFG_InstructionHazards;
 
@@ -425,6 +426,7 @@ namespace NuclearOptionVWS
             CFG_InstructionHazardPriority = plugin.Config.Bind(HazardSettings, "Instruction hazard Priority", 7, new ConfigDescription("What priority do you want to assign instruction hazards " + MiscData.PriorityDescriptionText, new AcceptableValueList<int>(MiscData.GetPriorityDropDownArray())));
             plugin.Log(LogLevel.Info, "GeForce");
             CFG_GForceTolerance = plugin.Config.Bind(HazardSettings, "GeForce Tolerance", 8f, new ConfigDescription("How many Gs do you want to be pulled before an overG warning is issued", new AcceptableValueRange<float>(2, 10)));
+            CFG_MinimunSustainedGForceTime = plugin.Config.Bind(HazardSettings, "Minimun Sustained GForce Time", 0.25d, new ConfigDescription("How long do you want to experience high GForce before a warning is triggered", new AcceptableValueRange<double>(0, 10)));
             plugin.Log(LogLevel.Info, "Dictionary");
             CFG_InstructionHazards = new Dictionary<string, ConfigEntry<string>>();
             foreach (ConfigEntry<string> CFG in CFG_EnvironmentHazards)
@@ -446,6 +448,7 @@ namespace NuclearOptionVWS
         private bool DangerCloseFired = true;
         private bool FlaresLowFired = true;
         private bool CapacitorLowFired = true;
+        private double TimeOfLastAcceptableGForce = 0;
 
         private bool InSecondStageOfAltitudeComplaint = false;
         public void ResetAltitudeComplaintStatus()
@@ -485,23 +488,28 @@ namespace NuclearOptionVWS
                     Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("AoA").Value);
                 }
                 //OverG
-                if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value & !InstructionHierarchyCheck)
+                if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
                 {
                     if (Math.Abs(PlayerAircraft.gForce) > CFG_GForceTolerance.Value)
                     {
                         DangerousGForce = true;
-                        InstructionHierarchyCheck = true;
-                        ResetAltitudeComplaintStatus();
-                        Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
-                        Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
+                        
+                        if (!InstructionHierarchyCheck & (Time.timeSinceLevelLoadAsDouble - TimeOfLastAcceptableGForce)>CFG_MinimunSustainedGForceTime.Value)
+                        {
+                            InstructionHierarchyCheck = true;
+                            ResetAltitudeComplaintStatus();
+                            Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
+                            Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
+                        }
                     }
                     else
                     {
                         DangerousGForce = false;
+                        TimeOfLastAcceptableGForce = Time.timeSinceLevelLoadAsDouble;
                     }
                 }
 
-                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed & !InstructionHierarchyCheck & PlayerAircraft.speed > 10)
+                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed & PlayerAircraft.speed > 10)
                 {
                     ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
                     if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
@@ -532,7 +540,7 @@ namespace NuclearOptionVWS
                         AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
                     }
 
-                    if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
+                    if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value & !InstructionHierarchyCheck)
                     {
                         InstructionHierarchyCheck = true;
                         bool tmp = InSecondStageOfAltitudeComplaint;

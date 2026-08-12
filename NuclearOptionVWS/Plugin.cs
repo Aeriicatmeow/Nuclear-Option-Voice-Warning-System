@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.0.0")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.0")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -54,7 +54,7 @@ public class Plugin : BaseUnityPlugin
     ConfigEntry<bool> CFG_AlwaysCallOutAircraft;
     public ConfigEntry<bool> CFG_OnlyCallOutLockedAirMissiles;
     ConfigEntry<bool> CFG_OnlyCallOutIfInLineOfSight;
-    //ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
+    ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
 
     //AudioStorage
     BearingAudConfig CFG_PositionCalloutAudio;
@@ -66,6 +66,7 @@ public class Plugin : BaseUnityPlugin
     List<Unit> NotableUnits;
     List<double> NotableUnitInternalPriority;
     List<float> NotableUnitTimeOfLastPing;
+    List<float> NotableUnitTimeOfLastWarned;
     int BasePriorityOfLastPlayed;
 
 
@@ -87,7 +88,8 @@ public class Plugin : BaseUnityPlugin
 
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 100)));
-        //CFG_MinimunDelayBetweenWarnings = Config.Bind("General", "MinimunDelayBeforeWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
+        
+        CFG_MinimunDelayBetweenWarnings = Config.Bind("VWS General", "MinimunDelayBeforeUnitWarningReIssued", 5f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
 
         CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 15f,new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MaxConsiderationDistanceGROUND = Config.Bind("VWS General", "Max Distance to analyse Ground units (Km)", 10f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
@@ -125,6 +127,7 @@ public class Plugin : BaseUnityPlugin
         NotableUnits = new List<Unit>();
         NotableUnitInternalPriority = new List<double>();
         NotableUnitTimeOfLastPing = new List<float>();
+        NotableUnitTimeOfLastWarned = new List<float>();
         BasePriorityOfLastPlayed = 0;
 
         Logger.LogInfo("Generating CFG Dictionary");
@@ -145,7 +148,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Updating Active Pack");
         PackHandler.UpdateActivePack();
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
-        Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System. \nAlternately, please contact me on Dicord. \n Nuclear Option Official Discord Channel: [PLACEHOLDER] \n Primerva 2082 Channel: [PLACEHOLDER] \n Thankyou in advance.");
+        Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System. \nAlternately, please contact me on Dicord. \n Nuclear Option Official Discord Channel: https://discord.com/channels/909034158205059082/1537140171110096976 \n Primerva 2082 Channel: https://discord.com/channels/1303878245942431765/1537143460090355863 \n Thankyou in advance.");
     }
     private bool VerifyFileStructure(ref string Root)
     {
@@ -295,6 +298,7 @@ public class Plugin : BaseUnityPlugin
                         NotableUnits.Add(unit);
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
                         NotableUnitTimeOfLastPing.Add(Time.timeSinceLevelLoad);
+                        NotableUnitTimeOfLastWarned.Add(0);
 
                     }
                     else
@@ -335,31 +339,26 @@ public class Plugin : BaseUnityPlugin
             if (NotableUnits[Index].NetId == 0)
             {
                 //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to NetID of 0 (unit nolonger exists)");
-                NotableUnits.RemoveAt(Index);
-                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
-                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                RemoveNotableUnit(Index);
                 ClearToProceed = false;
             }
             else if (Time.timeSinceLevelLoad - NotableUnitTimeOfLastPing[Index] > 1)
             {
                 //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to time out exception");
-                NotableUnits.RemoveAt(Index);
-                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
-                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                RemoveNotableUnit(Index);
                 ClearToProceed = false;
             }
             else if (!CheckIfValidForCallout(NotableUnits[Index], InstructionHazard.CheckIfMissileLocked(NotableUnits[Index], PlayerAircraft)))
             {
                 //Logger.LogInfo("Removing " + NotableUnits[Index].Identity + "Due to unit threat nolonger being valid");
-                NotableUnits.RemoveAt(Index);
-                NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
-                NotableUnitTimeOfLastPing.RemoveAt(Index);
+                RemoveNotableUnit(Index);
                 ClearToProceed = false;
             }
 
             if (ClearToProceed)
             {
-                if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority)//If its negetive, its already been called out.
+
+                if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority & !IsNotableUnitIndexOnCooldown(Index))//If its negetive, its already been called out.
                                                                                                                                                            //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
                                                                                                                                                            //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
                                                                                                                                                            //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
@@ -407,7 +406,7 @@ public class Plugin : BaseUnityPlugin
             //
             //Logger.LogInfo("Continuing a Missile Hazard. Specify Counterplay");
             AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
-            NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+            MarkNotableUnitAsCalled(Index);
         }
         else
         {
@@ -424,7 +423,7 @@ public class Plugin : BaseUnityPlugin
                 }
                 else
                 {
-                    NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+                    MarkNotableUnitAsCalled(Index);
                 }
             }
             else
@@ -444,7 +443,7 @@ public class Plugin : BaseUnityPlugin
                         //Logger.LogInfo("Reloading notable units");
                         for (int i = 0; i < NotableUnits.Count; i++)
                         {
-                            if (NotableUnitInternalPriority[i] == LowestPriority)
+                            if (NotableUnitInternalPriority[i] == LowestPriority & !IsNotableUnitIndexOnCooldown(Index))
                             {
                                 NotableUnitInternalPriority[i] = -LowestPriority;//this resets it and puts it back into the calling list
                             }
@@ -461,6 +460,21 @@ public class Plugin : BaseUnityPlugin
         //}
         //Logger.LogInfo("[END OF NOTABLE UNITS LIST]");
 
+    }
+    private void MarkNotableUnitAsCalled(int Index)
+    {
+        NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
+        NotableUnitTimeOfLastWarned[Index] = Time.timeSinceLevelLoad;
+    }
+    private void RemoveNotableUnit(int Index)
+    {
+        NotableUnits.RemoveAt(Index);
+        NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
+        NotableUnitTimeOfLastPing.RemoveAt(Index);
+    }
+    private bool IsNotableUnitIndexOnCooldown(int Index)
+    {
+        return Time.timeSinceLevelLoad - NotableUnitTimeOfLastWarned[Index] < CFG_MinimunDelayBetweenWarnings.Value;
     }
     public int GetHighestBasePriority()
     {
@@ -668,6 +682,11 @@ public class Plugin : BaseUnityPlugin
         {
             Logger.LogFatal(EXP);
         }
+    }
+    public void TriggerDeathOutcome()
+    {
+        Audio.ClearAllQueues();
+        NullPosition = true;
     }
     #endregion
 
