@@ -42,7 +42,9 @@ The same is true to 'Low' and 'High'
   high - Audio to be played when the enemy is significantly above your cockpit (determined by the Significant Angle Value)
 ```
 ### HAZARD CUES
-Each Hazard type is assigned a priority. This determines what band a hazard is in. A hazards priority will increase as it gets closer to you but will never be put into the band above. Priority is exponential meaning that a hazard right next to you will have a significantly higher priority than a hazard far away.
+Each Hazard type is assigned a priority. This determines what band a hazard is in. 
+Giving a Hazard a priority of 0 will result in the VWS ignoring the hazard. Likewise, not assigning any audio to a hazard will also result in the VWS ignoring it
+A hazards priority will increase as it gets closer to you but will never be put into the band above. Priority is exponential meaning that a hazard right next to you will have a significantly higher priority than a hazard far away.
 
 All hazards in the highest band will be called out in order of priority. This means that if multiple enemies are in the same priority band, the enemy closest to you will be called out first.
 
