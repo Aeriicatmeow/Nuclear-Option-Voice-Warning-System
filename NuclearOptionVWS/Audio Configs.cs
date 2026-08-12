@@ -274,7 +274,8 @@ namespace NuclearOptionVWS
                     if (!HostileHazards[i].Definition.Key.Contains(' '))
                     {
                         Regex tmpRegex = new Regex(HostileHazards[i].Definition.Key.ToUpper());
-                        if (tmpRegex.Match(unit.definition.code).Success)
+                        if (tmpRegex.Match(unit.definition.code).Success
+                            || unit.definition.code == "AAA" & HostileHazards[i].Definition.Key == "Manpads")
                         {
                             HazardPriority = Priority[i].Value;
                             return HostileHazards[i];

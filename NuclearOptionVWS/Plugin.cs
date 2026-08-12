@@ -82,6 +82,7 @@ public class Plugin : BaseUnityPlugin
         Logger = base.Logger;
 
         Logger.LogInfo("Please note, this version is intended for Nuclear Option 0.34");
+        //Unit_AAThreat_Ripper.Initialise();
         Logger.LogInfo("Establishing core configs");
 
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
@@ -191,6 +192,7 @@ public class Plugin : BaseUnityPlugin
         {
             PackHandler.SaveCurrentSelectedConfig();
         }
+        Unit_AAThreat_Ripper.DumpData(Path.GetDirectoryName(Info.Location) + @"\AllUnitsAAThreats.txt");
     }
     private void Update()
     {
@@ -265,6 +267,7 @@ public class Plugin : BaseUnityPlugin
         //Logger.LogInfo("MapIcon Request recieved");
         //Logger.LogInfo(NullPosition);
         //Logger.LogInfo(unit.Identity);
+        Unit_AAThreat_Ripper.ConsiderUnitForList(unit);
         try
         {
             //Logger.LogInfo(PlayerAircraft.NetworkHQ);
