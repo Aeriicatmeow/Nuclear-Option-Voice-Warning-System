@@ -796,7 +796,7 @@ namespace NuclearOptionVWS
             Vector3 vector = Aircraft.cockpit.transform.InverseTransformDirection(Aircraft.cockpit.rb.velocity);
             float num = Mathf.Atan2(vector.y, vector.z) * -57.29578f;
            // Plugin.I.Log(LogLevel.Info, "AoA VAL: " + num);
-            if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f)
+            if (Aircraft.speed > VelocityThreshold & num > StallHornThreshold * 0.85f & CheckIfAoAWarningisValidOnVTOL(Aircraft))
             {
                 DangerousAoA = true;
                 //Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("AoA").Value);
@@ -814,6 +814,10 @@ namespace NuclearOptionVWS
                 FatalAoA = false;
                 DangerousAoA = false;
             }
+        }
+        private bool CheckIfAoAWarningisValidOnVTOL(Aircraft PlayerAircraft)
+        {
+            return !(PlayerAircraft.definition.aircraftParameters.verticalLanding & PlayerAircraft.gearDeployed);
         }
         public ConfigEntry<string> GetMissileResponseAudio(Unit unit, Aircraft PlayerAircraft)
         {
