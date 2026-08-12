@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.0")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.2")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -87,7 +87,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Establishing core configs");
 
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
-        CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 100)));
+        CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 200)));
         
         CFG_MinimunDelayBetweenWarnings = Config.Bind("VWS General", "MinimunDelayBeforeUnitWarningReIssued", 5f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
 
