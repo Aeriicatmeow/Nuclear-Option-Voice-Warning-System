@@ -623,7 +623,7 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            if (AircraftConcerned == PlayerAircraft & !NullPosition)
+            if (AircraftConcerned == PlayerAircraft & !NullPosition & AircraftConcerned != null & Audio != null & CFG_Enabled.Value)
             {
                 CFG_InstructionHazardAudio.CheckBINGOWarning(PlayerAircraft, FuelUsedOnTick, Audio);
             }
@@ -639,7 +639,7 @@ public class Plugin : BaseUnityPlugin
     }
     public void TriggerAoACheck(float StallHornThreshold, float VelocityThreshold)
     {
-        if (!NullPosition)
+        if (!NullPosition & CFG_Enabled.Value)
         {
             try
             {
@@ -655,7 +655,7 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            if (AircraftConcerned == PlayerAircraft)
+            if (AircraftConcerned == PlayerAircraft & CFG_Enabled.Value)
             {
                 CFG_InstructionHazardAudio.ResetFuelWarningStates();
             }

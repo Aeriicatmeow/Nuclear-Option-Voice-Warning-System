@@ -14,7 +14,7 @@ using System.Diagnostics.Tracing;
 using NuclearOptionVWS;
 using HarmonyLib;
 
-namespace Lock_Shoot_Tone_Ping
+namespace NuclearOptionVWS
 {
 
     internal class AudioHandler
