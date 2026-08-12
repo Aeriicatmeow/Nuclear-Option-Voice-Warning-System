@@ -1,0 +1,128 @@
+[BLD]
+Refinery Structure = 0
+Enrichment Plant = 0
+Vehicle Depot = 0.05
+Storage Tank = 0
+[FAC]
+Vertical Factory = 0
+Large Factory = 0
+[HGR-H]
+Hardened Aircraft Shelter = 0
+[MBT]
+Spearhead MBT = 0.2
+Type-12 MBT = 0.2
+[RDR]
+MSV Radar = 1
+HLT Radar Truck = 1
+Radar Station = 0
+[SAM R]
+MSV R9 Stratolance Launcher = 1
+StratoLance R9 Launcher = 1
+T9K41 Boltstrike = 1
+[AMMO]
+MSV Munitions = 0
+Ammo Dump = 0
+Munitions Bunker = 0
+HLT Munitions Truck = 0
+[AIRCRAFT]
+A-19 Brawler = 0.3
+Alkyon AB-4 = 0.7
+VT-7 Vagrant = 0.624
+SAH-46 Chicane = 0.272
+CI-22 Cricket = 0.44
+VL-49 Tarantula = 0.272
+UH-90 Ibis = 0.272
+SFB-81 Darkreach = 0
+KR-67 Ifrit = 1
+EW-25 Medusa = 0.36
+FS-20 Vortex = 1
+FS-12 Revoker = 1
+T/A-30 Compass = 0.624
+[SPAAG]
+AeroSentry SPAAG = 0.717
+FGA-57 Anvil = 0.667
+[BNKR]
+Pillbox = 0.254
+[LADS]
+MSV LADS = 1
+HLT-HEL = 0
+[AAA]
+MSV CRAM = 0.6
+23mm AAA Emplacement = 0.551
+HLT-CRAM = 0.6
+[SAM IR]
+Linebreaker SAM = 0.824
+AFV8 Mobile Air Defense = 0.741
+[AA]
+AFV6 AA = 0.63
+[MANPADS]
+IRM-S1 Emplacement = 0.551
+[LCV25]
+LCV25 AT = 0.25
+LCV25 AA = 0.5
+[REV]
+Aircraft Revetment = 0
+[SHP]
+Argus Class Frigate = 0.9
+Cursor Class LFD = 0.9
+Dynamo Class Destroyer = 0.95
+Hyperion Class Carrier = 0.95
+Annex Class Carrier = 0.95
+Shard Class Corvette = 0.9
+[PILOT]
+Pilot = 0
+[TWR]
+Guard Tower = 0.1
+Control Tower = 0
+[HGR-M]
+Medium Aircraft Hangar = 0
+[HPAD]
+Helipad = 0
+[CEV]
+M12 Jackknife = 0.5
+[UGV]
+Hexhound SAM = 0.5
+Hexhound GMG = 0
+[FUEL]
+Fuel Depot = 0
+HLT Fuel Tanker = 0
+MSV Fuel Tanker = 0
+Fuel Container 10,000L = 0
+[PB]
+Surf Class Patrol Boat = 0.2
+[TBM]
+MSV Nuclear Ballistic Missile Launcher = 0
+MSV Ballistic Missile Launcher = 0
+[APC]
+AFV6 APC = 0.15
+AFV8 APC = 0.15
+Linebreaker APC = 0.377
+[IFV]
+AFV6 IFV = 0.15
+AFV8 IFV = 0.428
+Linebreaker IFV = 0.464
+[MRAP]
+MSV MRAP = 0.15
+[CMD]
+HLT Fire Control = 1
+MSV Fire Control = 1
+[TRK]
+HLT Flatbed = 0
+HLT Tractor = 0
+MSV Tractor = 1
+MSV Flatbed = 0
+[AT]
+AFV6 AT = 0.1
+[CTNR]
+Munitions Pallet = 0
+Munitions Container = 0
+[MG]
+12.7mm MG Emplacement = 0.1
+[ATGM]
+AT-145 Emplacement = 0
+[MLRS]
+MSV MLRS = 0
+[ARTY]
+HLT Mobile Artillery = 0
+[LCAC]
+OTB-31 landing craft = 0.2
