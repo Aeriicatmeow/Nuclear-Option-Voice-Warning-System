@@ -714,6 +714,7 @@ namespace NuclearOptionVWS
         {
             if (Aircraft.speed >= Aircraft.GetAircraftParameters().takeoffSpeed & BINGOTriggered == false)
             {
+                
                 TotalSummedSpeed += Aircraft.speed;
                 //Plugin.I.Log(LogLevel.Info, Aircraft.speed);
                 TotalFuelUsed += FuelUsedOnTick;
@@ -734,6 +735,7 @@ namespace NuclearOptionVWS
 
                     if (Aircraft.radarAlt > 1)//If Airborne
                     {
+                        
                         double AVGFuelConsumption = TotalFuelUsed / TotalSecondsOfFuelConsumption;
                         double AVGSpeed = TotalSummedSpeed / TotalEvaluations;
                         Airbase NearestAirbase = Aircraft.NetworkHQ.GetNearestAirbase(Aircraft.transform.position, new RunwayQuery
@@ -743,11 +745,15 @@ namespace NuclearOptionVWS
                             TailHook = Aircraft.weaponManager.HasTailHook(),
                             LandingSpeed = Mathf.Sqrt(Aircraft.GetMass() / Aircraft.definition.aircraftInfo.maxWeight) * Aircraft.GetAircraftParameters().takeoffSpeed
                         });
-
+                        if(NearestAirbase == null)
+                        {
+                            Plugin.I.Log(LogLevel.Error, "No Airbase found. Cannot do a BINGO check");
+                            return;
+                        }
                         int SecondsToRTB = (int)Math.Ceiling(FastMath.Distance(NearestAirbase.center.position, Aircraft.transform.position) / AVGSpeed);//distance(m), speed(ms-1)
-
                         if (SecondsToRTB * AVGFuelConsumption * 1.1f > Aircraft.GetFuelQuantity())
                         {
+                            
                             Audio.AddToQueue(CFG_InstructionHazards.Get("Check Fuel").Value);
                             Audio.AddToQueue(CFG_InstructionHazards.Get("Bingo Fuel").Value);
 
@@ -761,6 +767,7 @@ namespace NuclearOptionVWS
                     }
                 }
             }
+
 
             if (!CheckFuelTriggered & Aircraft.GetFuelLevel() < 0.3f)
             {
