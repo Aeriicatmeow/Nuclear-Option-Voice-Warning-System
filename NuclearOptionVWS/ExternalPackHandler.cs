@@ -12,6 +12,7 @@ using BepInEx.Configuration;
 using System.Linq;
 using Unity.Audio;
 using System.Collections;
+using System.Net;
 
 namespace Lock_Shoot_Tone_Ping
 {
@@ -53,6 +54,8 @@ namespace Lock_Shoot_Tone_Ping
             {
                 Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement being generated");
                 Directory.CreateDirectory(PRoot);
+                Plugin.I.Log(LogLevel.Info, "Retrieving Example Packs");
+                PopulateFolderWithExamplePacks(PRoot);
             }
 
             AudioHandlersForDifferentPacks = new List<PackAudioHandler>();
@@ -96,7 +99,52 @@ namespace Lock_Shoot_Tone_Ping
             }
             Plugin.I.Log(LogLevel.Info, "External Pack Handler Generated");
         }
-       
+        public static void PopulateFolderWithExamplePacks(string PRoot)
+        {
+            Plugin.I.Log(LogLevel.Info, "Attempting to download default packs");
+            try
+            {
+                WebClient Client = new WebClient();
+
+                string[] DefaultPackNames =
+                {
+                "Betty",
+                "Rita",
+                "Xiao906"
+                };
+
+                string[] DefaultPackPaths = new string[DefaultPackNames.Length];
+                for (int i = 0; i < DefaultPackNames.Length; i++)
+                {
+                    DefaultPackPaths[i] = PRoot + "\\" + DefaultPackNames[i];
+                }
+
+                for (int i = 0; i < DefaultPackNames.Length; i++)
+                {
+                    Plugin.I.Log(LogLevel.Info, "Downloading and processing:" + DefaultPackNames[i]);
+                    Client.DownloadFile(new System.Uri(@"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/" + DefaultPackNames[i] + ".zip"), DefaultPackPaths[i] + ".zip");
+                    System.IO.Compression.ZipFile.ExtractToDirectory(DefaultPackPaths[i] + ".zip", PRoot);
+                }
+                Plugin.I.Log(LogLevel.Info, "Example Packs Downloaded");
+                Plugin.I.Log(LogLevel.Info, "Deleting Old Zip Files");
+                foreach(string s in DefaultPackPaths)
+                {
+                    try
+                    {
+                        File.Delete(s + ".zip");
+                    }
+                    catch(Exception EXP)
+                    {
+                        Plugin.I.Log(LogLevel.Error, EXP);
+                    }
+                }
+            }
+            catch (Exception EXP)
+            {
+                Plugin.I.Log(LogLevel.Error, EXP);
+            }
+            
+        }
         public string GetDefaultConfigPath() => DefaultPath+ "\\" + ConfigFileName;
         public string GetDefaultPath() => DefaultPath;
         public string[] GeneratePackNamesArray()

@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.2")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.3")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -172,7 +172,17 @@ public class Plugin : BaseUnityPlugin
         }
 
         CreateDirectoryIfNone(Root, "Audio");
+        bool DownloadExamplePacks = false;
+        string PRoot = $"{Root}\\Packs";
+        if (!Directory.Exists(PRoot))
+        {
+            DownloadExamplePacks = true;
+        }
         CreateDirectoryIfNone(Root, "Packs");
+        if (DownloadExamplePacks)
+        {
+            ExternalPackHandler.PopulateFolderWithExamplePacks(PRoot);
+        }
 
         return ReturnVal;
     }
