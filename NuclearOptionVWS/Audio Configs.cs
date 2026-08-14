@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine.UIElements.Collections;
 using UnityEngine;
+using NuclearOption.Networking;
 
 namespace NuclearOptionVWS
 {
@@ -17,6 +18,7 @@ namespace NuclearOptionVWS
         public const int FirstStagePriority = Int16.MinValue;
         public const int SecondStagePriority = Int32.MinValue;
         public const string PriorityDescriptionText = "(Higher number = Higher Priority). A priority of 0 will result in the audio not being played at all";
+        public static int[] DefaultUncalledRoughPosition = { int.MaxValue, int.MaxValue };
         public static int[] GetPriorityDropDownArray()
         {
             int[] PriorityDropDown = new int[10];
@@ -78,10 +80,32 @@ namespace NuclearOptionVWS
             SignificantAngle = plugin.Config.Bind("Position Audio", "Significant Angle", 10f, new ConfigDescription("the Angle of deviation from the chord line of your aircraft before the VWS considers an object to be high or low", new AcceptableValueRange<float>(5, 45)));
         }
 
-        private int GetUpperBearing(int i) => (i * 90 + 45 + 360) % 360;
-        private int GetLowerBearing(int i) => (i * 90 - 45 + 360) % 360;
-        private int GetIndex(int Bearing) => ((Bearing + 45) / 90) % 4;
-
+        private static int GetUpperBearing(int i) => (i * 90 + 45 + 360) % 360;
+        private static int GetLowerBearing(int i) => (i * 90 - 45 + 360) % 360;
+        public static int GetIndex(int Bearing) => ((Bearing + 45) / 90) % 4;
+        public static int GetIndex(Aircraft PlayerAircraft, Unit EnemyUnit)
+        {
+            return GetIndex((int)Math.Round(GetRelativeBearing(PlayerAircraft, EnemyUnit.GlobalPosition())));
+        }
+        public int GetAltitudeClass(Aircraft PlayerAircraft,Unit EnemyUnit)
+        {
+            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(PlayerAircraft, EnemyUnit.GlobalPosition());
+            if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
+            {
+                if(ChordAngleDeviation < 0)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 1;
+                }
+            }
+            else
+            {
+                return 0;
+            }
+        }
         public ConfigEntry<string>[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition)
         {
             ConfigEntry<string>[] ReturnString;

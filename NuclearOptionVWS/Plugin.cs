@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.1.3")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.2.0")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -54,7 +54,10 @@ public class Plugin : BaseUnityPlugin
     ConfigEntry<bool> CFG_AlwaysCallOutAircraft;
     public ConfigEntry<bool> CFG_OnlyCallOutLockedAirMissiles;
     ConfigEntry<bool> CFG_OnlyCallOutIfInLineOfSight;
+
     ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
+    ConfigEntry<bool> CFG_ReIssueUnitWarningOnSignificantPositionChange;
+    ConfigEntry<bool> CFG_BulkGroupAnnouncementForUnits;
 
     //AudioStorage
     BearingAudConfig CFG_PositionCalloutAudio;
@@ -67,6 +70,7 @@ public class Plugin : BaseUnityPlugin
     List<double> NotableUnitInternalPriority;
     List<float> NotableUnitTimeOfLastPing;
     List<float> NotableUnitTimeOfLastWarned;
+    List<int[]> NotableUnitRoughPositionOfLastWarned;
     int BasePriorityOfLastPlayed;
 
 
@@ -88,10 +92,10 @@ public class Plugin : BaseUnityPlugin
 
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 200)));
-        
+
         CFG_MinimunDelayBetweenWarnings = Config.Bind("VWS General", "MinimunDelayBeforeUnitWarningReIssued", 5f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
 
-        CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 15f,new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
+        CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 15f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MaxConsiderationDistanceGROUND = Config.Bind("VWS General", "Max Distance to analyse Ground units (Km)", 10f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MinAirThreat = Config.Bind("VWS General", "Minimun threat posed by unit", 0.5f, new ConfigDescription("Minimun threat a unit must pose to the aircraft for it to be considered by the VWS", new AcceptableValueRange<float>(0, 1)));
         CFG_AlwaysCallOutAircraft = Config.Bind("VWS General", "Ignore Aircraft Capability", false, "If checked, all nearby enemy aircraft will be called out regardless of if their A2A capability");
@@ -119,7 +123,7 @@ public class Plugin : BaseUnityPlugin
 
             Logger.LogInfo("Audio Configs Initialised");
         }
-        catch(Exception EXP)
+        catch (Exception EXP)
         {
             Logger.LogFatal(EXP);
         }
@@ -128,6 +132,7 @@ public class Plugin : BaseUnityPlugin
         NotableUnitInternalPriority = new List<double>();
         NotableUnitTimeOfLastPing = new List<float>();
         NotableUnitTimeOfLastWarned = new List<float>();
+        NotableUnitRoughPositionOfLastWarned = new List<int[]>();
         BasePriorityOfLastPlayed = 0;
 
         Logger.LogInfo("Generating CFG Dictionary");
@@ -137,7 +142,7 @@ public class Plugin : BaseUnityPlugin
             CFG_InstructionHazardAudio.AddToCFGDictionary(ref PackHandler);
             CFG_HostilehazardsAudio.AddToCFGDictionary(ref PackHandler);
         }
-        catch(Exception EXP)
+        catch (Exception EXP)
         {
             Logger.LogFatal(EXP);
         }
@@ -164,7 +169,7 @@ public class Plugin : BaseUnityPlugin
             {
                 File.Copy(Info.Location, Root + "\\" + LastInPath.Match(Info.Location).Groups[2].Value);
             }
-            catch(Exception EXP)
+            catch (Exception EXP)
             {
                 Logger.LogFatal("FAILED TO COPY");
                 Logger.LogFatal(EXP);
@@ -191,7 +196,7 @@ public class Plugin : BaseUnityPlugin
         string tmp = $"{Root}\\{FolderName}";
         if (!Directory.Exists(tmp))
         {
-            Logger.LogError(FolderName+" folder not found. Generating replacement");
+            Logger.LogError(FolderName + " folder not found. Generating replacement");
             Directory.CreateDirectory(tmp);
         }
     }
@@ -219,7 +224,7 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
 
-        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null&CFG_Enabled.Value)
+        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null & CFG_Enabled.Value)
         {
             NullPosition = false;
             PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
@@ -255,7 +260,7 @@ public class Plugin : BaseUnityPlugin
                 //    NotableUnitInternalPriority.Add(CFG_InstructionHazardAudio.GetInstructionHazardPriority());
                 //}
                 bool CTP;
-                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this,out CTP);
+                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this, out CTP);
                 //Logger.LogInfo("Hazards");
                 if (CTP)
                 {
@@ -287,7 +292,7 @@ public class Plugin : BaseUnityPlugin
             //Logger.LogInfo(unit.NetworkHQ);
 
             if (((PlayerHQ != null & PlayerHQ != unit.NetworkHQ & unit.NetworkHQ != null)
-                ||IsLocked) 
+                || IsLocked)
                 & !NullPosition)//If Enemy (or is locked onto you)
             {
                 if (!IsLocked)
@@ -297,7 +302,7 @@ public class Plugin : BaseUnityPlugin
                 //Logger.LogInfo("1st calling cull");
 
 
-                if (CheckIfValidForCallout(unit,IsLocked)) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
+                if (CheckIfValidForCallout(unit, IsLocked)) //ya gonna want to know of a lock regardless of if its 1km away or 100km away.
                 {
 
                     //Logger.LogInfo(unit.Identity + "Is Valid");
@@ -309,7 +314,7 @@ public class Plugin : BaseUnityPlugin
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
                         NotableUnitTimeOfLastPing.Add(Time.timeSinceLevelLoad);
                         NotableUnitTimeOfLastWarned.Add(0);
-
+                        NotableUnitRoughPositionOfLastWarned.Add(MiscData.DefaultUncalledRoughPosition);
                     }
                     else
                     {
@@ -318,19 +323,19 @@ public class Plugin : BaseUnityPlugin
                 }
             }
         }
-        catch(Exception EXP)
+        catch (Exception EXP)
         {
             Logger.LogFatal(EXP);
         }
     }
     private void UpdateNotableUnits()
     {
-        if(Audio.GetTotalQueueLength() > 0)
+        if (Audio.GetTotalQueueLength() > 0)
         {
             //Logger.LogInfo("Returning notable unit update as the audio queue is occupied");
             return;
         }
-        if(NotableUnits.Count == 0)
+        if (NotableUnits.Count == 0)
         {
             //Logger.LogInfo("Returning notable unit update as there are no notable units in list");
             return;
@@ -369,11 +374,11 @@ public class Plugin : BaseUnityPlugin
             {
 
                 if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority & !IsNotableUnitIndexOnCooldown(Index))//If its negetive, its already been called out.
-                                                                                                                                                           //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
-                                                                                                                                                           //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
-                                                                                                                                                           //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
-                                                                                                                                                           //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
-                                                                                                                                                           //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
+                                                                                                                                                                                                  //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
+                                                                                                                                                                                                  //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
+                                                                                                                                                                                                  //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
+                                                                                                                                                                                                  //This is specifically done because the List.contains function is probably written in a lower level language and so is faster. This is useful if the unit list is very cluttered
+                                                                                                                                                                                                  //This is a shit system if someone else is working on this. Its a good thing im the only one working on this
                 {
                     if (NotableUnitInternalPriority[Index] > 0)
                     {
@@ -395,13 +400,13 @@ public class Plugin : BaseUnityPlugin
                 Index++;
 
             }
-                
 
 
-            
+
+
 
         }
-        if(NotableUnits.Count == 0)
+        if (NotableUnits.Count == 0)
         {
             return;
         }
@@ -475,12 +480,14 @@ public class Plugin : BaseUnityPlugin
     {
         NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
         NotableUnitTimeOfLastWarned[Index] = Time.timeSinceLevelLoad;
+        NotableUnitRoughPositionOfLastWarned[Index] = GenerateRoughPosition(NotableUnits[Index]);
     }
     private void RemoveNotableUnit(int Index)
     {
         NotableUnits.RemoveAt(Index);
         NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
         NotableUnitTimeOfLastPing.RemoveAt(Index);
+        NotableUnitRoughPositionOfLastWarned.RemoveAt(Index);
     }
     private bool IsNotableUnitIndexOnCooldown(int Index)
     {
@@ -489,7 +496,7 @@ public class Plugin : BaseUnityPlugin
     public int GetHighestBasePriority()
     {
         int High = -1;
-        foreach(Unit u in NotableUnits)
+        foreach (Unit u in NotableUnits)
         {
             int Priority = GetBasePriority(u);
             if (Priority > High)
@@ -518,13 +525,13 @@ public class Plugin : BaseUnityPlugin
     {
         ConsiderInterrupt(unit);
         ConfigEntry<string> Advice = CFG_InstructionHazardAudio.GetMissileResponseAudio(unit, PlayerAircraft);
-        if(Advice != null)
+        if (Advice != null)
         {
             Audio.AddToQueueLowPriority(Advice.Value);
         }
     }
     public bool LastHadPriortyOverride = false;
-    public void ConsiderInterrupt(Unit unit,int PriorityOverride = -1, bool ForceClearRegardless = false)
+    public void ConsiderInterrupt(Unit unit, int PriorityOverride = -1, bool ForceClearRegardless = false)
     {
         int CurrentPriority;
         if (PriorityOverride != -1)
@@ -554,7 +561,7 @@ public class Plugin : BaseUnityPlugin
         }
         BasePriorityOfLastPlayed = CurrentPriority;
     }
-    
+
     private int GetBasePriority(Unit unit)
     {
         int Priority;
@@ -569,13 +576,13 @@ public class Plugin : BaseUnityPlugin
             return true;
         }
 
-        if(CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false))
+        if (CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false))
         {
             //Logger.LogInfo("Fail due to unit not being valid in config");
             return false;
         }
 
-        
+
 
         GlobalPosition EnemyPosition = unit.GlobalPosition();
         GlobalPosition PlayerPosition = PlayerAircraft.GlobalPosition();
@@ -602,7 +609,7 @@ public class Plugin : BaseUnityPlugin
             IsGround = false;
         }
 
-        if(Distance < MaxConsiderationDistance * 1000f)
+        if (Distance < MaxConsiderationDistance * 1000f)
         {
             if (!IsGround & !IsMissile & CFG_AlwaysCallOutAircraft.Value)
             {
@@ -612,7 +619,7 @@ public class Plugin : BaseUnityPlugin
             {
                 float AAthreat = HostileHazardConfig.GetAAThreat(unit);
 
-                if(CFG_OnlyCallOutLockedAirMissiles.Value & unit.definition.typeIdentity.missile >= 0.5 & !InstructionHazard.CheckIfMissileLocked(unit,PlayerAircraft))
+                if (CFG_OnlyCallOutLockedAirMissiles.Value & unit.definition.typeIdentity.missile >= 0.5 & !InstructionHazard.CheckIfMissileLocked(unit, PlayerAircraft))
                 {
                     //Logger.LogInfo("Fail as Missile must be locked to not be ignored");
                     return false;
@@ -641,8 +648,54 @@ public class Plugin : BaseUnityPlugin
         {
             MaxConsiderationDistance = CFG_MaxConsiderationDistanceAIR.Value;
         }
-        return FastMath.Distance(PlayerAircraft.GlobalPosition(),Enemy.GlobalPosition()) < MaxConsiderationDistance * 1000f;
+        return FastMath.Distance(PlayerAircraft.GlobalPosition(), Enemy.GlobalPosition()) < MaxConsiderationDistance * 1000f;
     }
+    #region Update 1.2.0
+    private bool CheckIfTwoUnitsWouldHaveSameWarning(Unit Unit1, Unit Unit2)
+    {
+        if (CFG_PositionCalloutAudio.GetAltitudeClass(PlayerAircraft, Unit1) != CFG_PositionCalloutAudio.GetAltitudeClass(PlayerAircraft, Unit2))
+        {
+            return false;
+        }
+
+        if (CFG_HostilehazardsAudio.GetUnitAudio(Unit1, CFG_MinAirThreat) != CFG_HostilehazardsAudio.GetUnitAudio(Unit2, CFG_MinAirThreat))
+        {
+            return false;
+        }
+
+        if (BearingAudConfig.GetIndex(PlayerAircraft, Unit1) != BearingAudConfig.GetIndex(PlayerAircraft, Unit2))
+        {
+            return false;
+        }
+
+        return true;
+    }
+    private int[] GenerateRoughPosition(Unit unit)
+    {
+        int[] ReturnArray = {BearingAudConfig.GetIndex(PlayerAircraft,unit),CFG_PositionCalloutAudio.GetAltitudeClass(PlayerAircraft,unit)};
+        return ReturnArray;
+    }
+
+    private void MarkBulkWarningAsCalledIfNeeded(int Index)
+    {
+        if (CFG_BulkGroupAnnouncementForUnits.Value) 
+        {
+            int[] UnitRoughPos = GenerateRoughPosition(NotableUnits[Index]);
+            ConfigEntry<string> UnitAudio = CFG_HostilehazardsAudio.GetUnitAudio(NotableUnits[Index], CFG_MinAirThreat);
+            for (int i = 0; i < NotableUnits.Count; i++)
+            {
+                if (UnitRoughPos == GenerateRoughPosition(NotableUnits[i])) //Done in this staggered way to save on resources. its a micro optomisation but it adds up
+                {
+                    if(UnitAudio == CFG_HostilehazardsAudio.GetUnitAudio(NotableUnits[i], CFG_MinAirThreat))
+                    {
+                        MarkNotableUnitAsCalled(i);
+                    }
+                }
+            }
+        }
+    }
+    #endregion
+    #region Misc External Triggers
     public void TriggerBINGOCheck(Aircraft AircraftConcerned, float FuelUsedOnTick)
     {
         try
@@ -699,5 +752,5 @@ public class Plugin : BaseUnityPlugin
         NullPosition = true;
     }
     #endregion
-
+    #endregion
 }
