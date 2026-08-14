@@ -94,6 +94,8 @@ public class Plugin : BaseUnityPlugin
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 200)));
 
         CFG_MinimunDelayBetweenWarnings = Config.Bind("VWS General", "MinimunDelayBeforeUnitWarningReIssued", 5f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
+        CFG_ReIssueUnitWarningOnSignificantPositionChange = Config.Bind("VWS General", "ReIssueWarningOnSignificantChange", false, "If enabled, if the bearing and relative altitude of a hazard has changed significantly, the warning will be re-issued");
+        CFG_BulkGroupAnnouncementForUnits = Config.Bind("VWS General", "Issue Bulk Warnings", false, "If enabled, when a warning is issued. All other warnings that would have the same voice line will be marked as called");
 
         CFG_MaxConsiderationDistanceAIR = Config.Bind("VWS General", "Max Distance to analyse Air units (Km)", 15f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
         CFG_MaxConsiderationDistanceGROUND = Config.Bind("VWS General", "Max Distance to analyse Ground units (Km)", 10f, new ConfigDescription("Units outside of this distance will not be considered to be called out by the VWS", new AcceptableValueRange<float>(1, 50)));
@@ -373,7 +375,7 @@ public class Plugin : BaseUnityPlugin
             if (ClearToProceed)
             {
 
-                if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority & !IsNotableUnitIndexOnCooldown(Index))//If its negetive, its already been called out.
+                if (NotableUnitInternalPriority[Index] != MiscData.FirstStagePriority & NotableUnitInternalPriority[Index] != MiscData.SecondStagePriority & CooldownChecks(Index))//If its negetive, its already been called out.
                                                                                                                                                                                                   //If its Int16.MaxValue it is currently being called out (Hazard has only been called out itself).
                                                                                                                                                                                                   //If its Int32.MaxValue it is currently being called out. (Hazard is in its second stage of being called out. Bearing has been called out but not advise for 
                                                                                                                                                                                                   //In manyways, this means that the priority of an item increases as it is being called out cos cutting out part of it feels off.
@@ -421,7 +423,7 @@ public class Plugin : BaseUnityPlugin
             //
             //Logger.LogInfo("Continuing a Missile Hazard. Specify Counterplay");
             AddHazardAdviceOnlyToAudioList(NotableUnits[Index]);
-            MarkNotableUnitAsCalled(Index);
+            MarkNotableUnitAsCalled(Index, true);
         }
         else
         {
@@ -438,7 +440,7 @@ public class Plugin : BaseUnityPlugin
                 }
                 else
                 {
-                    MarkNotableUnitAsCalled(Index);
+                    MarkNotableUnitAsCalled(Index, true);
                 }
             }
             else
@@ -458,7 +460,7 @@ public class Plugin : BaseUnityPlugin
                         //Logger.LogInfo("Reloading notable units");
                         for (int i = 0; i < NotableUnits.Count; i++)
                         {
-                            if (NotableUnitInternalPriority[i] == LowestPriority & !IsNotableUnitIndexOnCooldown(Index))
+                            if (NotableUnitInternalPriority[i] == LowestPriority & CooldownChecks(Index))
                             {
                                 NotableUnitInternalPriority[i] = -LowestPriority;//this resets it and puts it back into the calling list
                             }
@@ -476,11 +478,16 @@ public class Plugin : BaseUnityPlugin
         //Logger.LogInfo("[END OF NOTABLE UNITS LIST]");
 
     }
-    private void MarkNotableUnitAsCalled(int Index)
+    private void MarkNotableUnitAsCalled(int Index, bool MarkBulkWarning = false)
     {
         NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
         NotableUnitTimeOfLastWarned[Index] = Time.timeSinceLevelLoad;
         NotableUnitRoughPositionOfLastWarned[Index] = GenerateRoughPosition(NotableUnits[Index]);
+
+        if (MarkBulkWarning)
+        {
+            MarkBulkWarningAsCalledIfNeeded(Index);
+        }
     }
     private void RemoveNotableUnit(int Index)
     {
@@ -693,6 +700,18 @@ public class Plugin : BaseUnityPlugin
                 }
             }
         }
+    }
+    private bool CooldownChecks(int Index)//true if not on cooldown. false if on cooldown
+    {
+        if (!IsNotableUnitIndexOnCooldown(Index))
+        {
+            return true;
+        }
+        if (GenerateRoughPosition(NotableUnits[Index]) != NotableUnitRoughPositionOfLastWarned[Index] & CFG_ReIssueUnitWarningOnSignificantPositionChange.Value)
+        {
+            return true;
+        }
+        return false;
     }
     #endregion
     #region Misc External Triggers
