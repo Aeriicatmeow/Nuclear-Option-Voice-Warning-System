@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using UnityEngine.UIElements.Collections;
 using UnityEngine;
 using NuclearOption.Networking;
+using System.Transactions;
 
 namespace NuclearOptionVWS
 {
@@ -87,9 +88,9 @@ namespace NuclearOptionVWS
         {
             return GetIndex((int)Math.Round(GetRelativeBearing(PlayerAircraft, EnemyUnit.GlobalPosition())));
         }
-        public int GetAltitudeClass(Aircraft PlayerAircraft,Unit EnemyUnit)
+        public int GetAltitudeClass(Aircraft PlayerAircraft,Unit EnemyUnit, bool RelativeToCockpit = true)
         {
-            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(PlayerAircraft, EnemyUnit.GlobalPosition());
+            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(PlayerAircraft, EnemyUnit.GlobalPosition(),RelativeToCockpit);
             if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
             {
                 if(ChordAngleDeviation < 0)
@@ -106,7 +107,7 @@ namespace NuclearOptionVWS
                 return 0;
             }
         }
-        public ConfigEntry<string>[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition)
+        public ConfigEntry<string>[] GetPositionAudioString(Aircraft Player, GlobalPosition EnemyPosition, bool RelativeToCockpit = true)
         {
             ConfigEntry<string>[] ReturnString;
             //GlobalPosition PlayerPosition = Player.GlobalPosition();
@@ -124,7 +125,7 @@ namespace NuclearOptionVWS
             //}
             //double ChordAngleDeviation = ((Math.Atan2(dx, Distance) + 3 * Math.PI) % (2 * Math.PI) * 180 / Math.PI) - Player.rb.rotation.eulerAngles.x;//(Math.Atan2(dy, Distance) * 180 / Math.PI) - Player.rb.rotation.eulerAngles.x;
             double RelativeBearing = GetRelativeBearing(Player, EnemyPosition);
-            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition);
+            double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition, RelativeToCockpit);
 
             //Plugin.I.Log(LogLevel.Info, "ANGLE: "+ChordAngleDeviation);
             if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
@@ -168,16 +169,30 @@ namespace NuclearOptionVWS
 
         }
 
-        public static float GetRelativeAltitudeDifferenceAngle(Aircraft Player, GlobalPosition EnemyPosition)
+        public static float GetRelativeAltitudeDifferenceAngle(Aircraft Player, GlobalPosition EnemyPosition, bool RelativeToCockpit)
         {
             Vector3 PlayerPos = Player.GlobalPosition().AsVector3();
             Vector3 EnemyPos = EnemyPosition.AsVector3();
-            Vector3 Difference = (EnemyPos - PlayerPos).normalized;
 
-            Vector3 up = Player.transform.up;
 
-            float Angle = Vector3.Angle(up, Difference);
-            return (Angle - 90) * -1;//this converts it to the format accepted by the mod
+
+            if (RelativeToCockpit)
+            {
+                Vector3 Difference = (EnemyPos - PlayerPos).normalized;
+                Vector3 up = Player.transform.up;
+
+                float Angle = Vector3.Angle(up, Difference);
+
+                return (Angle - 90) * -1;//this converts it to the format accepted by the mod
+            }
+            else
+            {
+                Vector3 Difference = (EnemyPos - PlayerPos);
+                Vector3 HorizontalDifference = new Vector3(Difference.x, 0, Difference.z);
+                double Angle = Math.Atan2(Difference.y, HorizontalDifference.magnitude) * 180f / Math.PI;
+                //Plugin.I.Log(LogLevel.Info, Angle);
+                return (float)Angle;
+            }
         }
         public void AddToCFGDictionary(ref ExternalPackHandler EPH)
         {
@@ -334,8 +349,16 @@ namespace NuclearOptionVWS
         {
             int ThreatPriority;
             ConfigEntry<string> AudioToUse = GetUnitAudio(unit, MinThreatConfig, out ThreatPriority, IsLocked);
-
-            return !(ThreatPriority > 0 & AudioToUse.Value != AudioHandler.NoAudio);
+            Plugin.I.Log(LogLevel.Info,unit.Identity + ":" + ThreatPriority);
+            if(ThreatPriority == 0)
+            {
+                return true;
+            }
+            if (AudioToUse.Value == AudioHandler.NoAudio)
+            {
+                return true;
+            }
+            return false;
 
 
 

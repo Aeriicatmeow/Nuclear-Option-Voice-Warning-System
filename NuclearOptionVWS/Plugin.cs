@@ -482,7 +482,7 @@ public class Plugin : BaseUnityPlugin
     {
         NotableUnitInternalPriority[Index] = -GetBasePriority(NotableUnits[Index]);
         NotableUnitTimeOfLastWarned[Index] = Time.timeSinceLevelLoad;
-        NotableUnitRoughPositionOfLastWarned[Index] = GenerateRoughPosition(NotableUnits[Index]);
+        NotableUnitRoughPositionOfLastWarned[Index] = GenerateRoughPosition(NotableUnits[Index],false);
 
         if (MarkBulkWarning)
         {
@@ -578,17 +578,18 @@ public class Plugin : BaseUnityPlugin
     public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
     {
         //Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
+
+
+        if (CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, LockedOverride))
+        {
+            //Logger.LogInfo("Fail due to unit not being valid in config");
+            //Logger.LogInfo(unit.Identity + "Removed due to being disabled in configs");
+            return false;
+        }
         if (LockedOverride & unit.definition.typeIdentity.missile >= 0.5)
         {
             return true;
         }
-
-        if (CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, false))
-        {
-            //Logger.LogInfo("Fail due to unit not being valid in config");
-            return false;
-        }
-
 
 
         GlobalPosition EnemyPosition = unit.GlobalPosition();
@@ -677,9 +678,9 @@ public class Plugin : BaseUnityPlugin
 
         return true;
     }
-    private int[] GenerateRoughPosition(Unit unit)
+    private int[] GenerateRoughPosition(Unit unit, bool RelativeToCockpit = true)
     {
-        int[] ReturnArray = {BearingAudConfig.GetIndex(PlayerAircraft,unit),CFG_PositionCalloutAudio.GetAltitudeClass(PlayerAircraft,unit)};
+        int[] ReturnArray = {BearingAudConfig.GetIndex(PlayerAircraft,unit),CFG_PositionCalloutAudio.GetAltitudeClass(PlayerAircraft,unit, RelativeToCockpit)};
         return ReturnArray;
     }
 
@@ -691,7 +692,7 @@ public class Plugin : BaseUnityPlugin
             ConfigEntry<string> UnitAudio = CFG_HostilehazardsAudio.GetUnitAudio(NotableUnits[Index], CFG_MinAirThreat);
             for (int i = 0; i < NotableUnits.Count; i++)
             {
-                if (UnitRoughPos == GenerateRoughPosition(NotableUnits[i])) //Done in this staggered way to save on resources. its a micro optomisation but it adds up
+                if (CheckIfTwoArraysSame(UnitRoughPos, GenerateRoughPosition(NotableUnits[i]))) //Done in this staggered way to save on resources. its a micro optomisation but it adds up
                 {
                     if(UnitAudio == CFG_HostilehazardsAudio.GetUnitAudio(NotableUnits[i], CFG_MinAirThreat))
                     {
@@ -707,11 +708,32 @@ public class Plugin : BaseUnityPlugin
         {
             return true;
         }
-        if (GenerateRoughPosition(NotableUnits[Index]) != NotableUnitRoughPositionOfLastWarned[Index] & CFG_ReIssueUnitWarningOnSignificantPositionChange.Value)
+        if (GenerateRoughPosition(NotableUnits[Index], false)[0] != NotableUnitRoughPositionOfLastWarned[Index][0] & CFG_ReIssueUnitWarningOnSignificantPositionChange.Value)
         {
+            //Logger.LogInfo("Dump");
+            //Logger.LogInfo(NotableUnitRoughPositionOfLastWarned[Index]);
+            //Logger.LogInfo(GenerateRoughPosition(NotableUnits[Index]));
             return true;
         }
         return false;
+    }
+    private bool CheckIfTwoArraysSame(int[] Array1, int[] Array2)
+    {
+        if(Array1.Length == Array2.Length)
+        {
+            for(int i = 0; i < Array1.Length; i++)
+            {
+                if (Array1[i] != Array2[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        else 
+        {
+            return false;
+        }
     }
     #endregion
     #region Misc External Triggers
