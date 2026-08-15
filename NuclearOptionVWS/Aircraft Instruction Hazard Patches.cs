@@ -48,11 +48,14 @@ namespace NuclearOptionVWS
         static void Postfix(Pilot __instance, bool __state)
         {
             if (__instance == null
-                || __state || !__instance.dead
-                || !GameManager.IsLocalPlayer<Player>(__instance.aircraft.Player)
+                || __state || !GameManager.IsLocalPlayer<Player>(__instance.aircraft.Player)
                 )
             {
                 return;
+            }
+            else if (!__instance.dead)
+            {
+                Plugin.I.TriggerDamageCheck();
             }
             else
             {

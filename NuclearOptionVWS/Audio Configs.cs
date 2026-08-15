@@ -10,6 +10,7 @@ using UnityEngine.UIElements.Collections;
 using UnityEngine;
 using NuclearOption.Networking;
 using System.Transactions;
+using System.Runtime.CompilerServices;
 
 namespace NuclearOptionVWS
 {
@@ -349,7 +350,7 @@ namespace NuclearOptionVWS
         {
             int ThreatPriority;
             ConfigEntry<string> AudioToUse = GetUnitAudio(unit, MinThreatConfig, out ThreatPriority, IsLocked);
-            Plugin.I.Log(LogLevel.Info,unit.Identity + ":" + ThreatPriority);
+            //Plugin.I.Log(LogLevel.Info,unit.Identity + ":" + ThreatPriority);
             if(ThreatPriority == 0)
             {
                 return true;
@@ -529,10 +530,15 @@ namespace NuclearOptionVWS
                 //AoA
                 if ((Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value) & (DangerousAoA || FatalAoA))
                 {
-                    InstructionHierarchyCheck = true;
-                    ResetAltitudeComplaintStatus();
-                    Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
-                    Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("AoA").Value);
+
+                    ConfigEntry<string> Warning = CFG_InstructionHazards.Get("AoA");
+                    if (Warning.Value != AudioHandler.NoAudio) 
+                    {
+                        InstructionHierarchyCheck = true;
+                        ResetAltitudeComplaintStatus();
+                        Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
+                        Audio.AddToQueueNoDuplicates(Warning.Value);
+                    }
                 }
                 //OverG
                 if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value)
@@ -543,10 +549,13 @@ namespace NuclearOptionVWS
                         
                         if (!InstructionHierarchyCheck & (Time.timeSinceLevelLoadAsDouble - TimeOfLastAcceptableGForce)>CFG_MinimunSustainedGForceTime.Value)
                         {
-                            InstructionHierarchyCheck = true;
-                            ResetAltitudeComplaintStatus();
-                            Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
-                            Audio.AddToQueueNoDuplicatesLowPriority(CFG_InstructionHazards.Get("OverG").Value);
+                            ConfigEntry<string> Warning = CFG_InstructionHazards.Get("OverG");
+                            if (Warning.Value != AudioHandler.NoAudio) {
+                                InstructionHierarchyCheck = true;
+                                ResetAltitudeComplaintStatus();
+                                Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
+                                Audio.AddToQueueNoDuplicatesLowPriority(Warning.Value);
+                            }
                         }
                     }
                     else
@@ -669,6 +678,7 @@ namespace NuclearOptionVWS
             }
             //Plugin.I.Log(LogLevel.Info, "IR Sig: " + PlayerAircraft.GetIRSource().intensity);
 
+            UpdateAircraftHealth(PlayerAircraft);
             //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
             if (CheckIfEjectAdvisable(PlayerAircraft))
             {
@@ -683,18 +693,16 @@ namespace NuclearOptionVWS
         private bool DangerousAoA = false;
         private bool FatalTrajectory = false;
         private bool DangerousGForce = false;
-        Queue<PilotHealthSnapshot> PilotHealthTrend;
 
-        private struct PilotHealthSnapshot
-        {
-            public float PilotHealth;
-            public float TimeOfReading;
-            public PilotHealthSnapshot(float PilotHealth, float Time)
-            {
-                this.PilotHealth = PilotHealth;
-                this.TimeOfReading = Time;
-            }
-        }
+        private float TimeOfLastPilotVitalReading = 0;
+        Queue<float> PilotHealthTrend;
+
+        private float TimeOfLastHealthCheck = 0;
+        private float MaxAircraftHealth = 0;
+        //private float MaxAerodynamicHealth = 0;
+        private bool FatalDamage = false;
+
+
         private bool CheckIfEjectAdvisable(Aircraft PlayerAircraft)
         {
             if (PlayerAircraft.partDamageTracker.GetDetachedRatio() > 0.4)
@@ -707,25 +715,94 @@ namespace NuclearOptionVWS
                 return true;
             }
 
-            if (PlayerAircraft.cockpit.hitPoints < 10)
+            if (PlayerAircraft.cockpit.hitPoints < 5)
             {
                 return true;
             }
 
-
-            //foreach (Pilot p in PlayerAircraft.pilots)
+            if (FatalDamage)
+            {
+                return true;
+            }
+            //if(TimeOfLastPilotVitalReading - Time.timeSinceLevelLoad > 0.2f)
             //{
-            //    if (p.player == PlayerAircraft.Player)
+            //    TimeOfLastPilotVitalReading = Time.timeSinceLevelLoad;
+            //    float MainPilotHealth = 0;
+            //    foreach(Pilot p in PlayerAircraft.pilots)
             //    {
-            //        p.
-            //        PilotHealthTrend.AddItem(new PilotHealthSnapshot(p.))
+            //        if (p.playerControlled)
+            //        {
+
+            //            float PilotHP = (float)(typeof(Pilot).GetField("hitPoints", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(p));
+            //            MainPilotHealth += PilotHP;
+            //        }
             //    }
+
+            //    while (PilotHealthTrend.Count < 3)
+            //    {
+            //        PilotHealthTrend.Enqueue(MainPilotHealth);
+            //    }
+            //    PilotHealthTrend.Dequeue();
+            //    PilotHealthTrend.Enqueue(MainPilotHealth);
+                
             //}
 
             return false;
         }
+        private void GetAircraftHealthComponents(Aircraft PlayerAircraft, out float GeneralHealth, out float AerodynamicHealth)
+        {
+            AerodynamicHealth = 0;
+            GeneralHealth = 0;
+            foreach (UnitPart p in PlayerAircraft.GetAllParts())
+            {
+                if (p.GetType() == typeof(AeroPart))
+                {
+                    AerodynamicHealth += p.hitPoints;
+                }
+                GeneralHealth += p.hitPoints;
 
+                //Plugin.I.Log(LogLevel.Info,"HP"+p.hitPoints);
+            }
+        }
+        private void UpdateAircraftHealth(Aircraft Player)
+        {
+            //Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad - TimeOfLastHealthCheck);
+            if (Time.timeSinceLevelLoad - TimeOfLastHealthCheck > 0.1)
+            {
+                Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad);
+                float MaxAeroHitpoints = 0;
+                float MaxGenHitpoints = 0;
 
+                GetAircraftHealthComponents(Player,out MaxGenHitpoints,out MaxAeroHitpoints);
+
+                //Plugin.I.Log(LogLevel.Info, MaxAeroHitpoints + ":" + MaxGenHitpoints);
+
+                //if (MaxAeroHitpoints > MaxAerodynamicHealth)
+                //{
+                //    MaxAerodynamicHealth = MaxAeroHitpoints;
+                //}
+                if (MaxGenHitpoints > MaxAircraftHealth)
+                {
+                    //Plugin.I.Log(LogLevel.Info,"Setting Max HP");
+                    MaxAircraftHealth = MaxGenHitpoints;
+                }
+                else 
+                {
+                    //Plugin.I.Log(LogLevel.Info, "GEN:" + MaxGenHitpoints / MaxAircraftHealth);
+                    //Plugin.I.Log(LogLevel.Info, MaxGenHitpoints + "/" + MaxAircraftHealth);
+                    if (MaxGenHitpoints / MaxAircraftHealth < 0.2)
+                    {
+                        FatalDamage = true;
+                    }
+                    else
+                    {
+                        FatalDamage = false;
+                    }
+                }
+
+                TimeOfLastHealthCheck = Time.timeSinceLevelLoad;
+            }
+        }
 
         public void ResetAll()
         {
@@ -740,6 +817,13 @@ namespace NuclearOptionVWS
             DangerousGForce = false;
 
             InSecondStageOfAltitudeComplaint = false;
+            ResetAircraftHealth();
+        }
+        public void ResetAircraftHealth()
+        {
+            //MaxAerodynamicHealth = 0;
+            MaxAircraftHealth = 0;
+            FatalDamage = false;
         }
 
         private double TotalFuelUsed = 0;//Must be double due to how large the numbers will become over run time.
@@ -834,7 +918,6 @@ namespace NuclearOptionVWS
                 FuelLowTriggered = true;
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Low Fuel").Value);
             }
-
 
         }
         public void CheckAoAWarning(Aircraft Aircraft, float StallHornThreshold, float VelocityThreshold, AudioHandler Audio)
@@ -952,6 +1035,26 @@ namespace NuclearOptionVWS
                 OnUpdateFuelReset = true;
             }
         }
+        //public void CheckDamage(Aircraft PlayerAircraft)
+        //{
+        //    float GenHP;
+        //    float AeroHP;
+
+        //    GetAircraftHealthComponents(PlayerAircraft, out GenHP, out AeroHP);
+
+        //    Plugin.I.Log(LogLevel.Info, "GEN:" + GenHP / MaxAircraftHealth);
+        //    //Plugin.I.Log(LogLevel.Info, "AER:" + AeroHP / MaxAerodynamicHealth);
+        //    if(GenHP/MaxAircraftHealth < 0.15 )//|| AeroHP/MaxAerodynamicHealth < 0.4)
+        //    {
+        //        FatalDamage = true;
+        //    }
+        //    else
+        //    {
+        //        FatalDamage = false;
+        //    }
+        //}
+
+        
     }
 
     #endregion

@@ -161,6 +161,7 @@ public class Plugin : BaseUnityPlugin
     {
         bool ReturnVal = false;
         Regex LastInPath = new Regex(@"^(.*[\\])([^\\]*$)");
+        Logger.LogInfo("Root:" + Root);
         if (LastInPath.Match(Root).Groups[2].Value != FileModName)
         {
             CreateDirectoryIfNone(Root, FileModName);
@@ -577,7 +578,7 @@ public class Plugin : BaseUnityPlugin
     }
     public bool CheckIfValidForCallout(Unit unit, bool LockedOverride = false)
     {
-        //Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT");
+        //Logger.LogInfo("ENTERING CHECK FOR VALID CALL OUT "+unit.Identity);
 
 
         if (CFG_HostilehazardsAudio.IsUnitExcludedViaConfig(unit, PlayerAircraft, CFG_MinAirThreat, LockedOverride))
@@ -791,6 +792,10 @@ public class Plugin : BaseUnityPlugin
     {
         Audio.ClearAllQueues();
         NullPosition = true;
+    }
+    public void TriggerDamageCheck()
+    {
+        //CFG_InstructionHazardAudio.CheckDamage(PlayerAircraft);
     }
     #endregion
     #endregion
