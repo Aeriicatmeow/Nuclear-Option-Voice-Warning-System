@@ -28,7 +28,7 @@ public class Plugin : BaseUnityPlugin
 
 
     #region MainPlugin
-    private const string FileModName = "NuclearOption-VWS";
+    private const string FileModName = "NuclearOptionVWS";
     bool DeletePluginDllOnClose = false;
     public static Plugin I { get; private set; }
     internal static new ManualLogSource Logger;
@@ -159,18 +159,35 @@ public class Plugin : BaseUnityPlugin
     }
     private bool VerifyFileStructure(ref string Root)
     {
+        string OldFilemodname = "NuclearOption-VWS";
         bool ReturnVal = false;
         Regex LastInPath = new Regex(@"^(.*[\\])([^\\]*$)");
         Logger.LogInfo("Root:" + Root);
-        if (LastInPath.Match(Root).Groups[2].Value != FileModName)
+        Match LastInPathmatch = LastInPath.Match(Root);
+        if (LastInPathmatch.Groups[2].Value == OldFilemodname)
         {
+            Logger.LogError("Oldfilemodname detected");
+            string Oldroot = Root;
+            Root += "\\" + FileModName;
+
+            Directory.Move(Oldroot, LastInPathmatch.Groups[1].Value+FileModName);
+        }
+        else if (LastInPathmatch.Groups[2].Value != FileModName)
+        {
+
             CreateDirectoryIfNone(Root, FileModName);
             Root += "\\" + FileModName;
             ReturnVal = true;
             Logger.LogError("Plugin has been found to be in the wrong head folder. Dll will be copied to correct head folder. This DLL will be moved when runtime terminated");
             try
             {
-                File.Copy(Info.Location, Root + "\\" + LastInPath.Match(Info.Location).Groups[2].Value);
+                string NewPath = Root + "\\" + LastInPath.Match(Info.Location).Groups[2].Value;
+                //I will always assume that the external dll is the newest
+                if (File.Exists(NewPath))
+                {
+                    File.Delete(NewPath);
+                }
+                File.Copy(Info.Location, NewPath);
             }
             catch (Exception EXP)
             {
@@ -178,7 +195,7 @@ public class Plugin : BaseUnityPlugin
                 Logger.LogFatal(EXP);
             }
         }
-
+        
         CreateDirectoryIfNone(Root, "Audio");
         bool DownloadExamplePacks = false;
         string PRoot = $"{Root}\\Packs";
