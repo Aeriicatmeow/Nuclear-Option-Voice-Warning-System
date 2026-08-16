@@ -227,8 +227,10 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
 
+        NullPosition = true;
         if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null & CFG_Enabled.Value)
         {
+
             NullPosition = false;
             PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
             PlayerHQ = SceneSingleton<DynamicMap>.i.HQ;
@@ -245,7 +247,7 @@ public class Plugin : BaseUnityPlugin
         }
         else
         {
-            NullPosition = true;
+            
             Audio.ClearAllQueues();
 
             CFG_InstructionHazardAudio.ResetAll();
@@ -253,30 +255,33 @@ public class Plugin : BaseUnityPlugin
 
         if (!NullPosition)
         {
-            //Logger.LogInfo("Main Update Loop");
-            try
+            if (!PlayerAircraft.HasEjected())
             {
-                //Logger.LogInfo("Instructions");
-                //if (CFG_InstructionHazardAudio.CheckIfAnInstructionComplaintShouldBeIssued())
-                //{
-                //    NotableUnits.Add(PlayerAircraft);
-                //    NotableUnitInternalPriority.Add(CFG_InstructionHazardAudio.GetInstructionHazardPriority());
-                //}
-                bool CTP;
-                CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this, out CTP);
-                //Logger.LogInfo("Hazards");
-                if (CTP)
+                //Logger.LogInfo("Main Update Loop");
+                try
                 {
-                    UpdateNotableUnits();
+                    //Logger.LogInfo("Instructions");
+                    //if (CFG_InstructionHazardAudio.CheckIfAnInstructionComplaintShouldBeIssued())
+                    //{
+                    //    NotableUnits.Add(PlayerAircraft);
+                    //    NotableUnitInternalPriority.Add(CFG_InstructionHazardAudio.GetInstructionHazardPriority());
+                    //}
+                    bool CTP;
+                    CFG_InstructionHazardAudio.InstructionWarnings(PlayerAircraft, Audio, this, out CTP);
+                    //Logger.LogInfo("Hazards");
+                    if (CTP)
+                    {
+                        UpdateNotableUnits();
+                    }
+                    else
+                    {
+                        //Logger.LogInfo("InstructionWarnings have taken priority");
+                    }
                 }
-                else
+                catch (Exception EXP)
                 {
-                    //Logger.LogInfo("InstructionWarnings have taken priority");
+                    Logger.LogFatal(EXP);
                 }
-            }
-            catch (Exception EXP)
-            {
-                Logger.LogFatal(EXP);
             }
 
         }

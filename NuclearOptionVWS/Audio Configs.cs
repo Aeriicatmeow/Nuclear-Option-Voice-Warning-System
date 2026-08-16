@@ -680,7 +680,7 @@ namespace NuclearOptionVWS
 
             UpdateAircraftHealth(PlayerAircraft);
             //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
-            if (CheckIfEjectAdvisable(PlayerAircraft))
+            if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected())
             {
                 Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value);
             }
@@ -769,7 +769,7 @@ namespace NuclearOptionVWS
             //Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad - TimeOfLastHealthCheck);
             if (Time.timeSinceLevelLoad - TimeOfLastHealthCheck > 0.1)
             {
-                Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad);
+                //Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad);
                 float MaxAeroHitpoints = 0;
                 float MaxGenHitpoints = 0;
 
