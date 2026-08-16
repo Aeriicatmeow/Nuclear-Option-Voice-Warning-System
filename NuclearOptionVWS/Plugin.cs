@@ -227,7 +227,7 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal(EXP);
         }
 
-        NullPosition = true;
+
         if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null & CFG_Enabled.Value)
         {
 
@@ -247,10 +247,7 @@ public class Plugin : BaseUnityPlugin
         }
         else
         {
-            
-            Audio.ClearAllQueues();
-
-            CFG_InstructionHazardAudio.ResetAll();
+            KillProgramLoop();
         }
 
         if (!NullPosition)
@@ -283,9 +280,20 @@ public class Plugin : BaseUnityPlugin
                     Logger.LogFatal(EXP);
                 }
             }
+            else
+            {
+                KillProgramLoop();
+            }
 
         }
 
+    }
+    private void KillProgramLoop()
+    {
+        NullPosition = true;
+        Audio.ClearAllQueues();
+
+        CFG_InstructionHazardAudio.ResetAll();
     }
 
     public void ObserveUnitBearingFromMapIcon(Unit unit, bool IsLocked)
