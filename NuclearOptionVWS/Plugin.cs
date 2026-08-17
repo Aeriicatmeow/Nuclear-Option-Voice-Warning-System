@@ -224,7 +224,15 @@ public class Plugin : BaseUnityPlugin
     {
         if (DeletePluginDllOnClose)
         {
-            File.Delete(Info.Location);
+            try
+            {
+                File.Delete(Info.Location);
+            }
+            catch(Exception EXP)
+            {
+                Logger.LogFatal("Could not delete file");
+                Logger.LogFatal(EXP);
+            }
         }
         else
         {
