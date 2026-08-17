@@ -168,9 +168,9 @@ public class Plugin : BaseUnityPlugin
         {
             Logger.LogError("Oldfilemodname detected");
             string Oldroot = Root;
-            Root += "\\" + FileModName;
+            Root = LastInPathmatch.Groups[1].Value + FileModName;
 
-            Directory.Move(Oldroot, LastInPathmatch.Groups[1].Value+FileModName);
+            Directory.Move(Oldroot, Root);
         }
         else if (LastInPathmatch.Groups[2].Value != FileModName)
         {
