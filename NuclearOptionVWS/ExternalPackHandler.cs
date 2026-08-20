@@ -132,9 +132,17 @@ namespace Lock_Shoot_Tone_Ping
 
                 for (int i = 0; i < DefaultPackNames.Length; i++)
                 {
-                    Plugin.I.Log(LogLevel.Info, "Downloading and processing:" + DefaultPackNames[i]);
-                    Client.DownloadFile(new System.Uri(DefaultPackURLs[i]), DefaultPackPaths[i] + ".zip");
-                    System.IO.Compression.ZipFile.ExtractToDirectory(DefaultPackPaths[i] + ".zip", PRoot);
+                    try
+                    {
+                        Plugin.I.Log(LogLevel.Info, "Downloading and processing:" + DefaultPackNames[i]);
+                        Client.DownloadFile(new System.Uri(DefaultPackURLs[i]), DefaultPackPaths[i] + ".zip");
+                        System.IO.Compression.ZipFile.ExtractToDirectory(DefaultPackPaths[i] + ".zip", PRoot);
+                    }
+                    catch(Exception EXP)
+                    {
+                        Plugin.I.Log(LogLevel.Error,"Error downloading pack");
+                        Plugin.I.Log(LogLevel.Error, EXP);
+                    }
                 }
                 Plugin.I.Log(LogLevel.Info, "Example Packs Downloaded");
                 Plugin.I.Log(LogLevel.Info, "Deleting Old Zip Files");
