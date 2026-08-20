@@ -104,25 +104,36 @@ namespace Lock_Shoot_Tone_Ping
             Plugin.I.Log(LogLevel.Info, "Attempting to download default packs");
             try
             {
+                Regex LastInURL = new Regex(@"^.*[\/]([^\/]*)\..+$");
                 WebClient Client = new WebClient();
 
-                string[] DefaultPackNames =
+                //string[] DefaultPackNames =
+                //{
+                //"Betty",
+                //"Rita",
+                //"Xiao906"
+                //};
+
+                string[] DefaultPackURLs =
                 {
-                "Betty",
-                "Rita",
-                "Xiao906"
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/Betty.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.3/Rita.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/Xiao906.zip"
                 };
+
+                string[] DefaultPackNames = new string[DefaultPackURLs.Length];
 
                 string[] DefaultPackPaths = new string[DefaultPackNames.Length];
                 for (int i = 0; i < DefaultPackNames.Length; i++)
                 {
+                    DefaultPackNames[i] = LastInURL.Match(DefaultPackURLs[i]).Groups[1].Value;
                     DefaultPackPaths[i] = PRoot + "\\" + DefaultPackNames[i];
                 }
 
                 for (int i = 0; i < DefaultPackNames.Length; i++)
                 {
                     Plugin.I.Log(LogLevel.Info, "Downloading and processing:" + DefaultPackNames[i]);
-                    Client.DownloadFile(new System.Uri(@"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.3/" + DefaultPackNames[i] + ".zip"), DefaultPackPaths[i] + ".zip");
+                    Client.DownloadFile(new System.Uri(DefaultPackURLs[i]), DefaultPackPaths[i] + ".zip");
                     System.IO.Compression.ZipFile.ExtractToDirectory(DefaultPackPaths[i] + ".zip", PRoot);
                 }
                 Plugin.I.Log(LogLevel.Info, "Example Packs Downloaded");
