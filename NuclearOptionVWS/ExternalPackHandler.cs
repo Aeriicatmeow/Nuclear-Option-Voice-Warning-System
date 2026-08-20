@@ -122,7 +122,7 @@ namespace Lock_Shoot_Tone_Ping
                 for (int i = 0; i < DefaultPackNames.Length; i++)
                 {
                     Plugin.I.Log(LogLevel.Info, "Downloading and processing:" + DefaultPackNames[i]);
-                    Client.DownloadFile(new System.Uri(@"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/" + DefaultPackNames[i] + ".zip"), DefaultPackPaths[i] + ".zip");
+                    Client.DownloadFile(new System.Uri(@"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.3/" + DefaultPackNames[i] + ".zip"), DefaultPackPaths[i] + ".zip");
                     System.IO.Compression.ZipFile.ExtractToDirectory(DefaultPackPaths[i] + ".zip", PRoot);
                 }
                 Plugin.I.Log(LogLevel.Info, "Example Packs Downloaded");
