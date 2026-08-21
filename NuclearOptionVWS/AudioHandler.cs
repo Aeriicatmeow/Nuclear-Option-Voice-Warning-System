@@ -113,7 +113,7 @@ namespace NuclearOptionVWS
                 return;
             }
             SeeCompleteNoExceptions = SeeComplete;
-            Source.volume = Mathf.Min(Mathf.Clamp(Volume_Percent.Value / 100f, 0f, 2f), 2f);//Yes, this is just ripped from yappinator but a bird told me that unty api stuff is faster cos its all in c++
+            Source.volume = (Volume_Percent.Value / 100f);
 
             if (Audio == Source.clip & Source.isPlaying)
             {
