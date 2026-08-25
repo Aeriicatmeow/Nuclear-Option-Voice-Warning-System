@@ -116,9 +116,9 @@ namespace Lock_Shoot_Tone_Ping
 
                 string[] DefaultPackURLs =
                 {
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/Betty.zip",
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.3/Rita.zip",
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.0.0/Xiao906.zip"
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Betty.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Rita.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Xiao906.zip"
                 };
 
                 string[] DefaultPackNames = new string[DefaultPackURLs.Length];
