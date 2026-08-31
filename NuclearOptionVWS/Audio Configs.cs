@@ -391,6 +391,7 @@ namespace NuclearOptionVWS
         public ConfigEntry<float> CFG_GForceTolerance;
         public ConfigEntry<bool> CFG_InstructMissileCounterMeasures;
         public ConfigEntry<double> CFG_MinimunSustainedGForceTime;
+        public ConfigEntry<float> CFG_MinimunDelayBetweenWarnings;
 
         private Dictionary<string, ConfigEntry<string>> CFG_InstructionHazards;
 
@@ -475,8 +476,11 @@ namespace NuclearOptionVWS
             plugin.Log(LogLevel.Info, "GeForce");
             CFG_GForceTolerance = plugin.Config.Bind(HazardSettings, "GeForce Tolerance", 8f, new ConfigDescription("How many Gs do you want to be pulled before an overG warning is issued", new AcceptableValueRange<float>(2, 10)));
             CFG_MinimunSustainedGForceTime = plugin.Config.Bind(HazardSettings, "Minimun Sustained GForce Time", 0.25d, new ConfigDescription("How long do you want to experience high GForce before a warning is triggered", new AcceptableValueRange<double>(0, 10)));
+            plugin.Log(LogLevel.Info, "MinInstructionDelay");
+            CFG_MinimunDelayBetweenWarnings = plugin.Config.Bind(HazardSettings, "MinimunDelayBeforeInstructionWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear the same instruction warning again? [note this only applies for repeat warnings. i.e. AoA and OverG");
             plugin.Log(LogLevel.Info, "Dictionary");
             CFG_InstructionHazards = new Dictionary<string, ConfigEntry<string>>();
+
             foreach (ConfigEntry<string> CFG in CFG_EnvironmentHazards)
             {
                 CFG_InstructionHazards.Add(CFG.Definition.Key, CFG);
@@ -499,9 +503,17 @@ namespace NuclearOptionVWS
         private double TimeOfLastAcceptableGForce = 0;
 
         private bool InSecondStageOfAltitudeComplaint = false;
+
+        private float TimeOfLastAoAWarning;
+        private float TimeOfLastOverGWarning;
+        private float TimeOfLastAltitudeWarning;
         public void ResetAltitudeComplaintStatus()
         {
             InSecondStageOfAltitudeComplaint = false;
+        }
+        private bool MinDelaySinceLastWarning(float TimeOfLastWarning)
+        {
+            return Time.timeSinceLevelLoad - TimeOfLastWarning > CFG_MinimunDelayBetweenWarnings.Value;
         }
         public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin, out bool ClearToProceed)
         {
@@ -532,12 +544,14 @@ namespace NuclearOptionVWS
                 {
 
                     ConfigEntry<string> Warning = CFG_InstructionHazards.Get("AoA");
-                    if (Warning.Value != AudioHandler.NoAudio) 
+                    if (Warning.Value != AudioHandler.NoAudio & MinDelaySinceLastWarning(TimeOfLastAoAWarning))  
                     {
                         InstructionHierarchyCheck = true;
                         ResetAltitudeComplaintStatus();
                         Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
                         Audio.AddToQueueNoDuplicates(Warning.Value);
+
+                        TimeOfLastAoAWarning = Time.timeSinceLevelLoad;
                     }
                 }
                 //OverG
@@ -547,14 +561,17 @@ namespace NuclearOptionVWS
                     {
                         DangerousGForce = true;
                         
-                        if (!InstructionHierarchyCheck & (Time.timeSinceLevelLoadAsDouble - TimeOfLastAcceptableGForce)>CFG_MinimunSustainedGForceTime.Value)
+                        if (!InstructionHierarchyCheck & (Time.timeSinceLevelLoadAsDouble - TimeOfLastAcceptableGForce)>CFG_MinimunSustainedGForceTime.Value & MinDelaySinceLastWarning(TimeOfLastOverGWarning))
                         {
                             ConfigEntry<string> Warning = CFG_InstructionHazards.Get("OverG");
-                            if (Warning.Value != AudioHandler.NoAudio) {
+                            if (Warning.Value != AudioHandler.NoAudio) 
+                            {
                                 InstructionHierarchyCheck = true;
                                 ResetAltitudeComplaintStatus();
                                 Plugin.I.ConsiderInterrupt(PlayerAircraft, Priority);
                                 Audio.AddToQueueNoDuplicatesLowPriority(Warning.Value);
+
+                                TimeOfLastOverGWarning = Time.timeSinceLevelLoad;
                             }
                         }
                     }
@@ -565,7 +582,7 @@ namespace NuclearOptionVWS
                     }
                 }
 
-                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed & PlayerAircraft.speed > 10)
+                if (VerticalVel * -1 * CFG_SecondsToCollision.Value * 2 > Alt & !PlayerAircraft.gearDeployed & PlayerAircraft.speed > 10 )
                 {
                     ConfigEntry<string>[] AltitudeWarningLine = new ConfigEntry<string>[2];
                     if (VerticalVel * -1 * CFG_SecondsToCollision.Value > Alt)
@@ -596,7 +613,7 @@ namespace NuclearOptionVWS
                         AltitudeWarningLine[1] = CFG_InstructionHazards.Get("Pull Up");
                     }
 
-                    if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value & !InstructionHierarchyCheck)
+                    if (Plugin.GetHighestBasePriority() < CFG_InstructionHazardPriority.Value & !InstructionHierarchyCheck /*& MinDelaySinceLastWarning(TimeOfLastAltitudeWarning)*/)
                     {
                         InstructionHierarchyCheck = true;
                         bool tmp = InSecondStageOfAltitudeComplaint;
@@ -615,6 +632,8 @@ namespace NuclearOptionVWS
                         //{
                         //    Audio.AddToQueueNoDuplicatesLowPriority(s.Value);
                         //}
+
+                        TimeOfLastAltitudeWarning = Time.timeSinceLevelLoad;
                     }
                 }
                 else
@@ -818,6 +837,13 @@ namespace NuclearOptionVWS
 
             InSecondStageOfAltitudeComplaint = false;
             ResetAircraftHealth();
+            ResetInstructionWarningTimes();
+        }
+        public void ResetInstructionWarningTimes()
+        {
+            TimeOfLastAltitudeWarning = 0;
+            TimeOfLastOverGWarning = 0;
+            TimeOfLastAoAWarning = 0;
         }
         public void ResetAircraftHealth()
         {
