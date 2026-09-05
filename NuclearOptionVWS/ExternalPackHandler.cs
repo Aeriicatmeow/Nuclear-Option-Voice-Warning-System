@@ -99,12 +99,34 @@ namespace Lock_Shoot_Tone_Ping
             }
             Plugin.I.Log(LogLevel.Info, "External Pack Handler Generated");
         }
+        private static string[] GetDefaultPackURLs()
+        {
+            string[] DefaultPackURLs =
+                {
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Betty.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Rita.zip",
+                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Xiao906.zip"
+                };
+            return DefaultPackURLs;
+        }
+        public static string[] GetDefaultPackNames()
+        {
+            string[] tmp = GetDefaultPackURLs();
+            string[] Names = new string[tmp.Length + 1];
+            for (int i = 0; i < tmp.Length; i++)
+            {
+                Names[i + 1] = LastInURL.Match(tmp[i]).Groups[1].Value;
+            }
+            Names[0] = AudioHandler.NoAudio;
+            return Names;
+        }
+        private static Regex LastInURL = new Regex(@"^.*[\/]([^\/]*)\..+$");
         public static void PopulateFolderWithExamplePacks(string PRoot)
         {
             Plugin.I.Log(LogLevel.Info, "Attempting to download default packs");
             try
             {
-                Regex LastInURL = new Regex(@"^.*[\/]([^\/]*)\..+$");
+                
                 WebClient Client = new WebClient();
 
                 //string[] DefaultPackNames =
@@ -114,12 +136,7 @@ namespace Lock_Shoot_Tone_Ping
                 //"Xiao906"
                 //};
 
-                string[] DefaultPackURLs =
-                {
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Betty.zip",
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Rita.zip",
-                    @"https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System/releases/download/v1.2.5/Xiao906.zip"
-                };
+                string[] DefaultPackURLs = GetDefaultPackURLs();
 
                 string[] DefaultPackNames = new string[DefaultPackURLs.Length];
 
@@ -230,6 +247,11 @@ namespace Lock_Shoot_Tone_Ping
             }
             return ReturnArray;
         }
+
+        #region Getters&Setters
+        public string GetNameOfCurrentSelectedPack() => CFG_SelectedPack.Value;
+        public ConfigEntry<string> CurrentSelectedPack() => CFG_SelectedPack;
+        #endregion
 
         #region from LSTP main plugin class
         private void WriteConfigsToExternalFile(string Path, Dictionary<string,ConfigEntryBase> DictionaryOfAllSaveableConfigs)

@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.2.6")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.2.7")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -63,6 +63,9 @@ public class Plugin : BaseUnityPlugin
     BearingAudConfig CFG_PositionCalloutAudio;
     HostileHazardConfig CFG_HostilehazardsAudio;
     InstructionHazard CFG_InstructionHazardAudio;
+
+    //1.2.7
+    AircraftSpecificVWS AircraftBasedVWS;
 
     //Evidence Of Poor Programming:
 
@@ -114,6 +117,7 @@ public class Plugin : BaseUnityPlugin
 
         Logger.LogInfo("Creating Pack Handler");
         PackHandler = new ExternalPackHandler(Root, gameObject, CFG_Volume_Percent, this, out CFG_EncodingType, out Audio);
+
 
         try
         {
@@ -240,11 +244,14 @@ public class Plugin : BaseUnityPlugin
         }
         Unit_AAThreat_Ripper.DumpData(Path.GetDirectoryName(Info.Location) + @"\AllUnitsAAThreats.txt");
     }
+
     private void Update()
     {
+        AircraftSpecificVWS.TryInitialise(ref AircraftBasedVWS,this, PackHandler);
         //Logger.LogInfo("UPDATE");
         try
         {
+
             PackHandler.UpdateActivePack();
         }
         catch (Exception EXP)
@@ -263,7 +270,10 @@ public class Plugin : BaseUnityPlugin
             try
             {
                 Audio.Update();
-                CFG_InstructionHazardAudio.InstructionOnUpdate(PlayerAircraft);
+                if (!PlayerAircraft.HasEjected())
+                {
+                    CFG_InstructionHazardAudio.InstructionOnUpdate(PlayerAircraft);
+                }
             }
             catch (Exception EXP)
             {
@@ -277,6 +287,8 @@ public class Plugin : BaseUnityPlugin
 
         if (!NullPosition)
         {
+            AircraftBasedVWS.Update(PlayerAircraft, PackHandler);
+
             if (!PlayerAircraft.HasEjected())
             {
                 //Logger.LogInfo("Main Update Loop");

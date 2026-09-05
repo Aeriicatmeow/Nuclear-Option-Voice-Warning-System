@@ -13,6 +13,7 @@ using System.Linq;
 using System.Diagnostics.Tracing;
 using NuclearOptionVWS;
 using HarmonyLib;
+using UnityEngine.UI;
 
 namespace NuclearOptionVWS
 {

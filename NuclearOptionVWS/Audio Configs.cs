@@ -825,6 +825,8 @@ namespace NuclearOptionVWS
 
         public void ResetAll()
         {
+            ResetFuelWarningStates();
+
             ResetBINGOData();
             DangerCloseFired = true;
             FlaresLowFired = true;
