@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.2.7")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.2.8")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -247,6 +247,7 @@ public class Plugin : BaseUnityPlugin
 
     private void Update()
     {
+        AircraftSpecificVWS.EncylopediaBasedUpdate(AircraftBasedVWS);
         AircraftSpecificVWS.TryInitialise(ref AircraftBasedVWS,this, PackHandler);
         //Logger.LogInfo("UPDATE");
         try

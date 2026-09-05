@@ -86,7 +86,7 @@ namespace NuclearOptionVWS
 
             }
         }
-
+        public int GetNumberOfRegisteredAircraft() => PacksForAircraft.Length;
         public void Update(Aircraft PlayerAircraft, ExternalPackHandler PackHandler)
         {
             if (!Enabled.Value)
@@ -106,6 +106,17 @@ namespace NuclearOptionVWS
             {
                 PackHandler.CurrentSelectedPack().Value = TrueCorrectPack;
                 PackHandler.UpdateActivePack();
+            }
+        }
+        public static void EncylopediaBasedUpdate(AircraftSpecificVWS ASVWS)
+        {
+            if(Encyclopedia.i != null & initialisedSuccessfully)
+            {
+                if(Encyclopedia.i.aircraft.Count != ASVWS.GetNumberOfRegisteredAircraft())
+                {
+                    Plugin.I.Log(BepInEx.Logging.LogLevel.Info, "Discrepency in number of aircraft found. Correcting ASVWS");
+                    initialisedSuccessfully = false;
+                }
             }
         }
 
