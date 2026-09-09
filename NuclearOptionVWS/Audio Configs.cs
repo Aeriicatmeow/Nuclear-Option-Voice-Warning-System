@@ -984,7 +984,8 @@ namespace NuclearOptionVWS
 
                 float Distance = FastMath.Distance(PlayerAircraft.GlobalPosition(), unit.GlobalPosition()) / 1000;
                 string EndInstruction;
-                if (unit.definition.typeIdentity.radar >= 0.5)
+                string Seeker = GetMissileSeekerType(unit);
+                if (Seeker.Contains("ARH"))//if ARH or SARH
                 {
                     float RelBearing = BearingAudConfig.GetRelativeBearing(PlayerAircraft, unit.GlobalPosition());
                     if (CheckIfAtValue(90, 10, RelBearing) || CheckIfAtValue(270, 10, RelBearing) || Distance < 2)
@@ -996,7 +997,7 @@ namespace NuclearOptionVWS
                         EndInstruction = "Notch";
                     }
                 }
-                else
+                else if(Seeker == "IR")//If IR
                 {
                     //Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
                     if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
@@ -1008,9 +1009,24 @@ namespace NuclearOptionVWS
                         EndInstruction = "Decrease Throttle";
                     }
                 }
+                else //If anything else. (ARAD, Optical, laser)
+                {
+                    EndInstruction = "Notch";//Notching a Optical or laser is best proceedure. for ARADs, its turning off your radar...but there are no betty voice lines for "Kill your Radar"
+                }
                 return CFG_InstructionHazards.Get(EndInstruction);
             }
             return null;
+        }
+        private string GetMissileSeekerType(Unit unit)
+        {
+            if(unit.GetType() == typeof(Missile))
+            {
+                return ((Missile)unit).GetSeekerType();
+            }
+            else
+            {
+                return "";
+            }
         }
         public bool CheckIfResponseIsNeeded(Unit unit, Aircraft PlayerAircraft)
         {
