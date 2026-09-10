@@ -395,6 +395,8 @@ namespace NuclearOptionVWS
 
         private Dictionary<string, ConfigEntry<string>> CFG_InstructionHazards;
 
+        private ConfigEntry<bool> CFG_AdviseNotch;
+
         public InstructionHazard(Plugin plugin, string[] ArrayOfAllAudio)
         {
             ResetAll();
@@ -462,6 +464,8 @@ namespace NuclearOptionVWS
             }
 
             CFG_InstructMissileCounterMeasures = plugin.Config.Bind(Category, "Instruct on countermeasures", true, "If Enabled, All missile warnings will be appended with some instructions on how to counter them");
+            plugin.Log(LogLevel.Info,"Notch fringe cases");
+            CFG_AdviseNotch = plugin.Config.Bind(Category, "AdviseToNotchOnFringeCases", true, "If a Laser/Optical/ARAD missile is fired at you, the VWS will instruct you to notch it if 'Instruct on countermeasures' is enabled");
 
             const string HazardSettings = "Instruction Hazards Settings";
             plugin.Log(LogLevel.Info, "OUT");
@@ -478,6 +482,7 @@ namespace NuclearOptionVWS
             CFG_MinimunSustainedGForceTime = plugin.Config.Bind(HazardSettings, "Minimun Sustained GForce Time", 0.25d, new ConfigDescription("How long do you want to experience high GForce before a warning is triggered", new AcceptableValueRange<double>(0, 10)));
             plugin.Log(LogLevel.Info, "MinInstructionDelay");
             CFG_MinimunDelayBetweenWarnings = plugin.Config.Bind(HazardSettings, "MinimunDelayBeforeInstructionWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear the same instruction warning again? [note this only applies for repeat warnings. i.e. AoA and OverG");
+
             plugin.Log(LogLevel.Info, "Dictionary");
             CFG_InstructionHazards = new Dictionary<string, ConfigEntry<string>>();
 
@@ -1011,7 +1016,14 @@ namespace NuclearOptionVWS
                 }
                 else //If anything else. (ARAD, Optical, laser)
                 {
-                    EndInstruction = "Notch";//Notching a Optical or laser is best proceedure. for ARADs, its turning off your radar...but there are no betty voice lines for "Kill your Radar"
+                    if (CFG_AdviseNotch.Value)
+                    {
+                        EndInstruction = "Notch";//Notching a Optical or laser is best proceedure. for ARADs, its turning off your radar...but there are no betty voice lines for "Kill your Radar"
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
                 return CFG_InstructionHazards.Get(EndInstruction);
             }
