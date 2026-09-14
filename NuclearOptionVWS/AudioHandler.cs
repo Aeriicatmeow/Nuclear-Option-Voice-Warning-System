@@ -363,6 +363,12 @@ namespace NuclearOptionVWS
                 {
                     CurrentAudio = AudioQueue.Dequeue();
                 }
+
+                if(CurrentAudio == null)
+                {
+                    return;
+                }
+
                 PlayAudio(CurrentAudio,true);
 
             }
