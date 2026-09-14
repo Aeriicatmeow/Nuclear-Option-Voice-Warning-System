@@ -359,7 +359,7 @@ namespace NuclearOptionVWS
             if (!Source.isPlaying & AudioQueue.Count > 0)
             {
                 AudioClip CurrentAudio = null;
-                while(CurrentAudio == null)
+                while(CurrentAudio == null & AudioQueue.Count > 0)
                 {
                     CurrentAudio = AudioQueue.Dequeue();
                 }
