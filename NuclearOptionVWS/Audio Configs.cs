@@ -472,7 +472,7 @@ namespace NuclearOptionVWS
             CFG_AudioOut = plugin.Config.Bind(HazardSettings, "Suffix Depleted", AudioHandler.NoAudio,
                 new ConfigDescription("To be Appended onto the end of either the Jammer Audio (when Capacitor is low) or onto the end of the Flare Audio (When Flares are low)", new AcceptableValueList<string>(ArrayOfAllAudio)));
             plugin.Log(LogLevel.Info, "STC");
-            CFG_SecondsToCollision = plugin.Config.Bind(HazardSettings, "Seconds to collsion", 2f, "The number of seconds [s] you can continue to descend at this speed before crahsing into the ground. This value determines when the altitude warnings are played");
+            CFG_SecondsToCollision = plugin.Config.Bind(HazardSettings, "Seconds to collsion", 1.5f, "The number of seconds [s] you can continue to descend at this speed before crahsing into the ground. This value determines when the altitude warnings are played");
             plugin.Log(LogLevel.Info, "ALT");
             CFG_DangerousAltitude = plugin.Config.Bind(HazardSettings, "dangerous Altitude", 10, "If your relative altitude [m] is below this number, the dangerous altitude audio will be played");
             plugin.Log(LogLevel.Info, "PRIOR");
