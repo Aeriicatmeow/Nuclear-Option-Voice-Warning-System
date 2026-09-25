@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.0")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.1")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -367,7 +367,7 @@ public class Plugin : BaseUnityPlugin
                         NotableUnits.Add(unit);
                         NotableUnitInternalPriority.Add(GetBasePriority(unit));
                         NotableUnitTimeOfLastPing.Add(Time.timeSinceLevelLoad);
-                        NotableUnitTimeOfLastWarned.Add(0);
+                        NotableUnitTimeOfLastWarned.Add(int.MinValue);
                         NotableUnitRoughPositionOfLastWarned.Add(MiscData.DefaultUncalledRoughPosition);
                     }
                     else
@@ -547,6 +547,7 @@ public class Plugin : BaseUnityPlugin
         NotableUnitInternalPriority.RemoveAt(Index);//this is arguably a lot more primative but it does work
         NotableUnitTimeOfLastPing.RemoveAt(Index);
         NotableUnitRoughPositionOfLastWarned.RemoveAt(Index);
+        NotableUnitTimeOfLastWarned.RemoveAt(Index);
     }
     private bool IsNotableUnitIndexOnCooldown(int Index)
     {
