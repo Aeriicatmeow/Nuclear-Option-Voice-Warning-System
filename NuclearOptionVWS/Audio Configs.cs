@@ -704,14 +704,18 @@ namespace NuclearOptionVWS
 
             UpdateAircraftHealth(PlayerAircraft);
             //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
-            if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected())
+            if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected() & TimesEjectWarningIssued < 6)
             {
-                Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value);
+                if (Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value))
+                {
+                    TimesEjectWarningIssued++;
+                }
             }
 
             ClearToProceed = !InstructionHierarchyCheck;
         }
 
+        private int TimesEjectWarningIssued = 0;
 
         private bool FatalAoA = false;
         private bool DangerousAoA = false;
@@ -845,6 +849,8 @@ namespace NuclearOptionVWS
             InSecondStageOfAltitudeComplaint = false;
             ResetAircraftHealth();
             ResetInstructionWarningTimes();
+
+            TimesEjectWarningIssued = 0;
         }
         public void ResetInstructionWarningTimes()
         {

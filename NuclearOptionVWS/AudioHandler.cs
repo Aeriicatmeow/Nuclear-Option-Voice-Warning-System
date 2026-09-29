@@ -382,13 +382,15 @@ namespace NuclearOptionVWS
         {
             LowPriorityQueue.Enqueue(Search(Name));
         }
-        public void AddToQueueNoDuplicates(string Name)
+        public bool AddToQueueNoDuplicates(string Name)
         {
             AudioClip Audio = Search(Name);
             if (!AudioQueue.Contains(Audio))
             {
                 AddToQueue(Audio);
+                return true;
             }
+            return false;
         }
         public void AddToQueueNoDuplicatesLowPriority(string Name)
         {
