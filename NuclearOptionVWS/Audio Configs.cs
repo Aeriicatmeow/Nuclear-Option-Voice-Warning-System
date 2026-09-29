@@ -396,6 +396,7 @@ namespace NuclearOptionVWS
         private Dictionary<string, ConfigEntry<string>> CFG_InstructionHazards;
 
         private ConfigEntry<bool> CFG_AdviseNotch;
+        private ConfigEntry<int> CFG_EjectWarningRepeat;
 
         public InstructionHazard(Plugin plugin, string[] ArrayOfAllAudio)
         {
@@ -482,7 +483,8 @@ namespace NuclearOptionVWS
             CFG_MinimunSustainedGForceTime = plugin.Config.Bind(HazardSettings, "Minimun Sustained GForce Time", 0.25d, new ConfigDescription("How long do you want to experience high GForce before a warning is triggered", new AcceptableValueRange<double>(0, 10)));
             plugin.Log(LogLevel.Info, "MinInstructionDelay");
             CFG_MinimunDelayBetweenWarnings = plugin.Config.Bind(HazardSettings, "MinimunDelayBeforeInstructionWarningReIssued", 0f, "What is the minimun amount of time do you want to pass before you hear the same instruction warning again? [note this only applies for repeat warnings. i.e. AoA and OverG");
-
+            plugin.Log(LogLevel.Info, "MaxEjectWarn");
+            CFG_EjectWarningRepeat = plugin.Config.Bind(HazardSettings, "EjectionWarningLineRepeats", 6, "What is the maximun number of times you want to be told to eject per life? after the aircraft is deemed nolonger functional");
             plugin.Log(LogLevel.Info, "Dictionary");
             CFG_InstructionHazards = new Dictionary<string, ConfigEntry<string>>();
 
@@ -704,7 +706,7 @@ namespace NuclearOptionVWS
 
             UpdateAircraftHealth(PlayerAircraft);
             //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
-            if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected() & TimesEjectWarningIssued < 6)
+            if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected() & TimesEjectWarningIssued < CFG_EjectWarningRepeat.Value)
             {
                 if (Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value))
                 {
