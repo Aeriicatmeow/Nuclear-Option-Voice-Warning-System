@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.1")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.2")]
 public class Plugin : BaseUnityPlugin
 {
 
