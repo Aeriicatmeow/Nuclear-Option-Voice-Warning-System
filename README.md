@@ -125,7 +125,7 @@ Eject - Audio to be played advising you to eject after your aircraft is critical
 It is up to you if you want to abide by this recommendation obviously.
 ```
 
-## EXTERNAL PACK HANDLING (IMPORTED FOR LOCK SHOOT TONE PING)
+## EXTERNAL PACK HANDLING (IMPORTED FROM LOCK SHOOT TONE PING)
 ### EXTERNAL PACK INSTALLATION (AND EDITING) GUIDE
 
 All packs must contain:
