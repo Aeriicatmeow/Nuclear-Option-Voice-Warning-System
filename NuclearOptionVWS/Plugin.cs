@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.2")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.3")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -76,6 +76,9 @@ public class Plugin : BaseUnityPlugin
     List<int[]> NotableUnitRoughPositionOfLastWarned;
     int BasePriorityOfLastPlayed;
 
+    //1.3.3
+    ConfigEntry<KeyboardShortcut> CFG_PurgeWarningsBind;
+    //ConfigEntry<bool> CFG_PurgeWarnings;
 
     public void Log(LogLevel LogLevel, object Data)
     {
@@ -106,6 +109,9 @@ public class Plugin : BaseUnityPlugin
         CFG_AlwaysCallOutAircraft = Config.Bind("VWS General", "Ignore Aircraft Capability", false, "If checked, all nearby enemy aircraft will be called out regardless of if their A2A capability");
         CFG_OnlyCallOutLockedAirMissiles = Config.Bind("VWS General", "Only Call Out Locked", true, "If checked, Only locked missiles will be called out");
         CFG_OnlyCallOutIfInLineOfSight = Config.Bind("VWS General", "Only Call Out If In Line Of Sight", true, "If Checked, Only hazards that are in line of sight of the aircraft will be called out");
+
+        Logger.LogInfo("Establishing Binding Config");
+        CFG_PurgeWarningsBind = Config.Bind("VWS General", "Keybind to purge all current warnings", KeyboardShortcut.Empty, "When this key is pressed, all warnings that have not yet been read out will go on cooldown");
 
         Logger.LogInfo("Verifying File Structure");
         string Root = Path.GetDirectoryName(Info.Location);
@@ -257,9 +263,24 @@ public class Plugin : BaseUnityPlugin
         }
         catch (Exception EXP)
         {
-            Logger.LogFatal(EXP);
+            Logger.LogFatal("[Pack Handler]" + EXP);
         }
 
+        try
+        {
+            if (CFG_PurgeWarningsBind.Value.IsPressed())
+            {
+                for (int i = 0; i < NotableUnitTimeOfLastWarned.Count; i++)
+                {
+                    MarkNotableUnitAsCalled(i);
+                    Audio.ClearQueueLowPriority();
+                }
+            }
+        }
+        catch(Exception EXP)
+        {
+            Logger.LogFatal("[Keybind Interrupt]" + EXP);
+        }
 
         if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null & CFG_Enabled.Value)
         {
@@ -278,7 +299,7 @@ public class Plugin : BaseUnityPlugin
             }
             catch (Exception EXP)
             {
-                Logger.LogFatal(EXP);
+                Logger.LogFatal("[Instruction Loop]" + EXP);
             }
         }
         else
@@ -315,7 +336,7 @@ public class Plugin : BaseUnityPlugin
                 }
                 catch (Exception EXP)
                 {
-                    Logger.LogFatal(EXP);
+                    Logger.LogFatal("[Main Warning Loop]" +EXP);
                 }
             }
             else
