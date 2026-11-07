@@ -272,7 +272,7 @@ public class Plugin : BaseUnityPlugin
             {
                 for (int i = 0; i < NotableUnitTimeOfLastWarned.Count; i++)
                 {
-                    MarkNotableUnitAsCalled(i);
+                    MarkNotableUnitAsCalled(i); 
                     Audio.ClearQueueLowPriority();
                 }
             }
@@ -282,12 +282,12 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal("[Keybind Interrupt]" + EXP);
         }
 
-        if (SceneSingleton<CombatHUD>.i != null & SceneSingleton<CombatHUD>.i.aircraft != null & CFG_Enabled.Value)
+        if (SceneSingleton<CombatHUD>.i != null && SceneSingleton<CombatHUD>.i.aircraft != null && CFG_Enabled.Value)
         {
 
             NullPosition = false;
             PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
-            PlayerHQ = SceneSingleton<DynamicMap>.i.HQ;
+            PlayerHQ = SceneSingleton<DynamicMap>.i?.HQ;
 
             try
             {
@@ -309,7 +309,7 @@ public class Plugin : BaseUnityPlugin
 
         if (!NullPosition)
         {
-            AircraftBasedVWS.Update(PlayerAircraft, PackHandler);
+            AircraftBasedVWS?.Update(PlayerAircraft, PackHandler);
 
             if (!PlayerAircraft.HasEjected())
             {
@@ -366,9 +366,9 @@ public class Plugin : BaseUnityPlugin
             //Logger.LogInfo(PlayerAircraft.NetworkHQ);
             //Logger.LogInfo(unit.NetworkHQ);
 
-            if (((PlayerHQ != null & PlayerHQ != unit.NetworkHQ & unit.NetworkHQ != null)
+            if (((PlayerHQ != null && PlayerHQ != unit.NetworkHQ && unit.NetworkHQ != null)
                 || IsLocked)
-                & !NullPosition)//If Enemy (or is locked onto you)
+                && !NullPosition)//If Enemy (or is locked onto you)
             {
                 if (!IsLocked)
                 {
@@ -815,7 +815,7 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            if (AircraftConcerned == PlayerAircraft & !NullPosition & AircraftConcerned != null & Audio != null & CFG_Enabled.Value)
+            if (AircraftConcerned != null && AircraftConcerned == PlayerAircraft && !NullPosition && Audio != null && CFG_Enabled.Value)
             {
                 CFG_InstructionHazardAudio.CheckBINGOWarning(PlayerAircraft, FuelUsedOnTick, Audio);
             }
@@ -831,7 +831,7 @@ public class Plugin : BaseUnityPlugin
     }
     public void TriggerAoACheck(float StallHornThreshold, float VelocityThreshold)
     {
-        if (!NullPosition & CFG_Enabled.Value)
+        if (!NullPosition && CFG_Enabled.Value)
         {
             try
             {
@@ -847,7 +847,7 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            if (AircraftConcerned == PlayerAircraft & CFG_Enabled.Value)
+            if (AircraftConcerned != null && AircraftConcerned == PlayerAircraft && CFG_Enabled.Value)
             {
                 CFG_InstructionHazardAudio.ResetFuelWarningStates();
             }

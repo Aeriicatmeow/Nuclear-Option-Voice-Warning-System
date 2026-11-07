@@ -110,9 +110,9 @@ namespace NuclearOptionVWS
         }
         public static void EncylopediaBasedUpdate(AircraftSpecificVWS ASVWS)
         {
-            if(Encyclopedia.i != null & initialisedSuccessfully)
-            {
-                if(Encyclopedia.i.aircraft.Count != ASVWS.GetNumberOfRegisteredAircraft())
+            if (initialisedSuccessfully && ASVWS != null && Encyclopedia.i != null)
+          {
+              if (Encyclopedia.i.aircraft != null && Encyclopedia.i.aircraft.Count != ASVWS.GetNumberOfRegisteredAircraft())
                 {
                     Plugin.I.Log(BepInEx.Logging.LogLevel.Info, "Discrepency in number of aircraft found. Correcting ASVWS");
                     initialisedSuccessfully = false;
