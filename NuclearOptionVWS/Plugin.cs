@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.3")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.4")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -165,7 +165,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Updating Active Pack");
         PackHandler.UpdateActivePack();
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
-        Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System. \nAlternately, please contact me on Dicord. \n Nuclear Option Official Discord Channel: https://discord.com/channels/909034158205059082/1537140171110096976 \n Primerva 2082 Channel: https://discord.com/channels/1303878245942431765/1537143460090355863 \n Thankyou in advance.");
+        Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Nuclear-Option-Voice-Warning-System. \nAlternately, please contact me on Dicord. \n Nuclear Option Modding Forum: https://discord.com/channels/1566773809032331327/1568760481710211174 \n Primerva 2082 Channel: https://discord.com/channels/1303878245942431765/1537143460090355863 \n Thankyou in advance.");
     }
     private bool VerifyFileStructure(ref string Root)
     {
