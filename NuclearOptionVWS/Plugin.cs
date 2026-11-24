@@ -22,7 +22,7 @@ using NuclearOption.Debugging;
 
 namespace NuclearOptionVWS;
 
-[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.4")]
+[BepInPlugin("com.Aeriicatmeow.NuclearOptionVWS", "NuclearOption-VWS", "1.3.5")]
 public class Plugin : BaseUnityPlugin
 {
 
@@ -78,7 +78,9 @@ public class Plugin : BaseUnityPlugin
 
     //1.3.3
     ConfigEntry<KeyboardShortcut> CFG_PurgeWarningsBind;
-    //ConfigEntry<bool> CFG_PurgeWarnings;
+
+    //1.3.5
+    ConfigEntry<bool> CFG_EnableCompatibilityForThirdPerson;
 
     public void Log(LogLevel LogLevel, object Data)
     {
@@ -98,6 +100,7 @@ public class Plugin : BaseUnityPlugin
 
         CFG_Enabled = Config.Bind("General", "Enabled", true, "Do you want the mod to run?");
         CFG_Volume_Percent = Config.Bind("General", "Volume", 50, new ConfigDescription("How loud do you want VWS audio to be", new AcceptableValueRange<int>(0, 400)));
+        CFG_EnableCompatibilityForThirdPerson = Config.Bind("General", "3rd Person/HUD changing mod Compatibility" ,true, "If enabled, mod will depend on the map being visible ONLY. use if you are running any HUD altering mods or in 3rd person");
 
         CFG_MinimunDelayBetweenWarnings = Config.Bind("VWS General", "MinimunDelayBeforeUnitWarningReIssued", 5f, "What is the minimun amount of time do you want to pass before you hear a warning about the same unit again?");
         CFG_ReIssueUnitWarningOnSignificantPositionChange = Config.Bind("VWS General", "ReIssueWarningOnSignificantChange", false, "If enabled, if the bearing and relative altitude of a hazard has changed significantly, the warning will be re-issued");
@@ -253,6 +256,13 @@ public class Plugin : BaseUnityPlugin
 
     private void Update()
     {
+        //if (CFG_EnableCompatibilityForThirdPerson.Value)
+        //{
+        //    DynamicMap Map = SceneSingleton<DynamicMap>.i;
+            
+
+        //}
+
         AircraftSpecificVWS.EncylopediaBasedUpdate(AircraftBasedVWS);
         AircraftSpecificVWS.TryInitialise(ref AircraftBasedVWS,this, PackHandler);
         //Logger.LogInfo("UPDATE");
@@ -282,12 +292,15 @@ public class Plugin : BaseUnityPlugin
             Logger.LogFatal("[Keybind Interrupt]" + EXP);
         }
 
-        if (SceneSingleton<CombatHUD>.i != null && SceneSingleton<CombatHUD>.i.aircraft != null && CFG_Enabled.Value)
+        GameManager.GetLocalAircraft(out PlayerAircraft);
+        GameManager.GetLocalHQ(out PlayerHQ);
+        bool FirstPersonValid = SceneSingleton<CombatHUD>.i != null && SceneSingleton<CombatHUD>.i.aircraft != null;
+        if (PlayerAircraft != null && PlayerAircraft.isActiveAndEnabled && CFG_Enabled.Value && (FirstPersonValid || CFG_EnableCompatibilityForThirdPerson.Value)&&!PlayerAircraft.disabled)
         {
 
             NullPosition = false;
-            PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
-            PlayerHQ = SceneSingleton<DynamicMap>.i?.HQ;
+            //PlayerAircraft = SceneSingleton<CombatHUD>.i.aircraft;
+            //PlayerHQ = SceneSingleton<DynamicMap>.i?.HQ;
 
             try
             {
