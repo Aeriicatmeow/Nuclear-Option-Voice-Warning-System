@@ -228,7 +228,7 @@ namespace Lock_Shoot_Tone_Ping
                 if (!PAH.IsNull)
                 {
                     totalCount += PAH.Audio.Length;
-                    //Plugin.I.Log(LogLevel.Info, totalCount);
+                    DebugMode.Log(LogLevel.Info, totalCount, "GenerateArrayAllAudioEver() 1");
                 }
             }
             AudioClip[] ReturnArray = new AudioClip[totalCount];
@@ -239,7 +239,7 @@ namespace Lock_Shoot_Tone_Ping
                 {
                     foreach (AudioClip a in PAH.Audio)
                     {
-                        //Plugin.I.Log(LogLevel.Info, totalCount);
+                        DebugMode.Log(LogLevel.Info, totalCount, "GenerateArrayAllAudioEver() 2");
                         ReturnArray[totalCount] = a;
                         totalCount++;
                     }
@@ -354,8 +354,8 @@ namespace Lock_Shoot_Tone_Ping
                         //[0] is the config field, [1] is the value;
                         ConfigEntryBase SpecificConfig = Dictionary[data[0]];
 
-                        //Plugin.I.Log.LogInfo("Processing " + SpecificConfig.Definition);
-                        //Plugin.I.Log.LogInfo("OLD:" + SpecificConfig.BoxedValue);
+                        DebugMode.Log(LogLevel.Info, "Processing " + SpecificConfig.Definition, "LoadConfigsFromText() 1");
+                        DebugMode.Log(LogLevel.Info ,"OLD:" + SpecificConfig.BoxedValue, "LoadConfigsFromText() 2");
                         if (SpecificConfig.GetType() == typeof(ConfigEntry<bool>))
                         {
                             SpecificConfig.BoxedValue = data[1] switch
@@ -364,7 +364,7 @@ namespace Lock_Shoot_Tone_Ping
                                 "False" => false,
                                 _ => false
                             };
-                            //Plugin.I.Log.LogInfo("This is boolean");
+                            DebugMode.Log(LogLevel.Info, "This is boolean", "LoadConfigsFromText() 3");
                         
                         }
                         else if (SpecificConfig.GetType() == typeof(ConfigEntry<string>))
@@ -377,7 +377,7 @@ namespace Lock_Shoot_Tone_Ping
                             {
                                 SpecificConfig.BoxedValue = data[1];
                             }
-                            //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                            DebugMode.Log(LogLevel.Info, "replacing " + SpecificConfig.Definition + " with " + data[1], "LoadConfigsFromText() 4");
 
                         }
                         else if (SpecificConfig.GetType() == typeof(ConfigEntry<int>))
@@ -386,7 +386,7 @@ namespace Lock_Shoot_Tone_Ping
                             {
                                 SpecificConfig.BoxedValue = System.Convert.ToInt32(data[1]);
 
-                                //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                                DebugMode.Log(LogLevel.Info, "replacing " + SpecificConfig.Definition + " with " + data[1], "LoadConfigsFromText() 5");
                             }
                             else
                             {
@@ -399,7 +399,7 @@ namespace Lock_Shoot_Tone_Ping
                             {
                                 SpecificConfig.BoxedValue = float.Parse(data[1]);
 
-                                //Plugin.I.Log.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                                DebugMode.Log(LogLevel.Info, "replacing " + SpecificConfig.Definition + " with " + data[1], "LoadConfigsFromText() 6");
                             }
                             else
                             {
@@ -411,7 +411,7 @@ namespace Lock_Shoot_Tone_Ping
                             Plugin.I.Log(LogLevel.Error, "Unknown config. " + SpecificConfig.GetType());
                         }
 
-                        //Plugin.I.Log.LogInfo("NEW:" + SpecificConfig.BoxedValue);
+                        DebugMode.Log(LogLevel.Info, "NEW:" + SpecificConfig.BoxedValue, "LoadConfigsFromText() 7");
 
                     }
                 }
@@ -530,7 +530,7 @@ namespace Lock_Shoot_Tone_Ping
                         LoadConfigsFromText(CurrentAudioPack, DictionaryOfAllSaveableConfigs, true, CFG_WipeEmptyConfigs.Value);
                         Plugin.I.Log(LogLevel.Info, "Pack Loaded");
 
-                        //Plugin.I.Log(LogLevel.Info, "Reloading Mod (includes clearing config");
+                        DebugMode.Log(LogLevel.Info, "Reloading Mod (includes clearing config", "UpdateActivePack()");
 
 
                         //initialiseAllConfigsOnly();
@@ -627,7 +627,7 @@ namespace Lock_Shoot_Tone_Ping
             Regex IsSimplifiedComb = new Regex(@"Set \d Sounds");
             foreach (string s in Data)
             {
-                //Plugin.I.Log(LogLevel.Info, s);
+                DebugMode.Log(LogLevel.Info, s, "DetectEncodingType() 1");
 
                 if (IsSimplifiedComb.Match(s).Success)
                 {
@@ -637,7 +637,7 @@ namespace Lock_Shoot_Tone_Ping
             }
             foreach (string s in Data)
             {
-                //Plugin.I.Log(LogLevel.Info, s);
+                DebugMode.Log(LogLevel.Info, s, "DetectEncodingType() 2");
 
                 if (!Comb.Match(s).Success)
                 {
@@ -660,7 +660,7 @@ namespace Lock_Shoot_Tone_Ping
                 StreamLinedCategory tmp = StreamLinedCategory.SearchByName(dat[0], Categories);
                 if (tmp == null)
                 {
-                    //Plugin.I.Log(LogLevel.Info, "Category Doesnt Already Exist, Creating New");
+                    DebugMode.Log(LogLevel.Info, "Category Doesnt Already Exist, Creating New", "ConvertToStreamLined()");
                     tmp = new StreamLinedCategory(dat[0]);
                     Categories.Add(tmp);
                     Count+=2;
@@ -779,7 +779,7 @@ namespace Lock_Shoot_Tone_Ping
             if (IsSimplified)
             {
                 Plugin.I.Log(LogLevel.Info, "Second part (due to simplified format)");
-                //Plugin.I.Log(LogLevel.Info, ReturnString);
+                DebugMode.Log(LogLevel.Info, ReturnString, "ConvertToRaw() 1");
                 StreamLined = ReturnString.Split("\n");
                 ReturnString = "";
                 int InternalCounter = -1;
@@ -820,8 +820,8 @@ namespace Lock_Shoot_Tone_Ping
                
             }
 
-            //Plugin.I.Log(LogLevel.Info,"RAW INFERRED:");
-            //Plugin.I.Log(LogLevel.Info, ReturnString);
+            DebugMode.Log(LogLevel.Info,"RAW INFERRED:", "ConvertToRaw() 2");
+            DebugMode.Log(LogLevel.Info, ReturnString, "ConvertToRaw() 3");
             return ReturnString.Split("\n");
         }
         internal class StreamLinedCategory
@@ -853,7 +853,7 @@ namespace Lock_Shoot_Tone_Ping
                         return s;
                     }
                 }
-                //Plugin.I.Log(LogLevel.Error, "Category Not Found " + Name);
+                DebugMode.Log(LogLevel.Error, "Category Not Found " + Name, "SearchByName()");
                 return null;
             }
 

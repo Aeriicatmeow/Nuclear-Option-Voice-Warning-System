@@ -1,7 +1,10 @@
-﻿using System;
+﻿using BepInEx.Configuration;
+using BepInEx.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEngine;
 
 namespace NuclearOptionVWS
 {
@@ -77,6 +80,36 @@ namespace NuclearOptionVWS
 
                 File.WriteAllText(Path, ReturnString);
             }
+        }
+    }
+
+    public static class DebugMode
+    {
+        private static Plugin BasePlugin;
+        private static ConfigEntry<bool> ConfigEnabled;
+        public static void Initialise(Plugin ExternalBasePlugin)
+        {
+            BasePlugin = ExternalBasePlugin;
+            ConfigEnabled = BasePlugin.Config.Bind("General", "Debug Mode", false, "If enabled, mod will create larger debug logs in log output.log. This does cost some performance so only enable it to collect data before submitting a bug report.");
+
+        }
+
+        public static void Log(LogLevel Loglevel, object Data, string CallingScript = "")
+        {
+            BasePlugin.Log(Loglevel, "[DEBUG MODE+ |"+CallingScript+"@+"+Time.timeSinceLevelLoad+"| ]: " + Data);
+        }
+
+        public static void LogInfo(object Data, string CallingScript)
+        {
+            Log(LogLevel.Info, Data);
+        }
+        public static void LogError(object Data, string CallingScript)
+        {
+            Log(LogLevel.Error, Data);
+        }
+        public static void LogFatal(object Data, string CallingScript)
+        {
+            Log(LogLevel.Fatal, Data);
         }
     }
 }

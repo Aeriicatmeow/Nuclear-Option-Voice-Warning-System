@@ -128,7 +128,7 @@ namespace NuclearOptionVWS
             double RelativeBearing = GetRelativeBearing(Player, EnemyPosition);
             double ChordAngleDeviation = GetRelativeAltitudeDifferenceAngle(Player, EnemyPosition, RelativeToCockpit);
 
-            //Plugin.I.Log(LogLevel.Info, "ANGLE: "+ChordAngleDeviation);
+            DebugMode.Log(LogLevel.Info, "ANGLE: "+ChordAngleDeviation, "GetPositionAudioString()");
             if (Math.Abs(ChordAngleDeviation) >= SignificantAngle.Value)
             {
                 ReturnString = new ConfigEntry<string>[2];
@@ -191,7 +191,7 @@ namespace NuclearOptionVWS
                 Vector3 Difference = (EnemyPos - PlayerPos);
                 Vector3 HorizontalDifference = new Vector3(Difference.x, 0, Difference.z);
                 double Angle = Math.Atan2(Difference.y, HorizontalDifference.magnitude) * 180f / Math.PI;
-                //Plugin.I.Log(LogLevel.Info, Angle);
+                DebugMode.Log(LogLevel.Info, Angle, "GetRelativeAltitudeDifferenceAngle()");
                 return (float)Angle;
             }
         }
@@ -350,7 +350,7 @@ namespace NuclearOptionVWS
         {
             int ThreatPriority;
             ConfigEntry<string> AudioToUse = GetUnitAudio(unit, MinThreatConfig, out ThreatPriority, IsLocked);
-            //Plugin.I.Log(LogLevel.Info,unit.Identity + ":" + ThreatPriority);
+            DebugMode.Log(LogLevel.Info,unit.Identity + ":" + ThreatPriority, "GetUnitAudio");
             if(ThreatPriority == 0)
             {
                 return true;
@@ -525,10 +525,10 @@ namespace NuclearOptionVWS
         public void InstructionWarnings(Aircraft PlayerAircraft, AudioHandler Audio, Plugin Plugin, out bool ClearToProceed)
         {
 
-            //Plugin.I.Log(LogLevel.Info, "Instrucion Hazards");
-            //Plugin.I.Log(LogLevel.Info, "AoA: " + DangerousAoA);
-            //Plugin.I.Log(LogLevel.Info, "GForce: " + DangerousGForce);
-            //Plugin.I.Log(LogLevel.Info, "Altitude: " + FatalTrajectory);
+            DebugMode.Log(LogLevel.Info, "Instrucion Hazards", "InstructionWarnings() 1");
+            DebugMode.Log(LogLevel.Info, "AoA: " + DangerousAoA, "InstructionWarnings() 2");
+            DebugMode.Log(LogLevel.Info, "GForce: " + DangerousGForce, "InstructionWarnings() 3");
+            DebugMode.Log(LogLevel.Info, "Altitude: " + FatalTrajectory, "InstructionWarnings() 4");
 
             int Priority = CFG_InstructionHazardPriority.Value;
 
@@ -540,7 +540,7 @@ namespace NuclearOptionVWS
             float VerticalVel = Vector3.Dot(PlayerAircraft.CockpitRB().velocity, Vector3.up);
 
             float BankAngle = ConvertAngleToNegpi2piRange(PlayerAircraft.transform.eulerAngles.z);//Vector3.SignedAngle(Vector3.up, PlayerAircraft.transform.up, PlayerAircraft.transform.forward);
-                                                                                                  //Plugin.I.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle);
+                                                                                                  DebugMode.Log(LogLevel.Info, "[BANKANGLE]"+BankAngle, "InstructionWarnings() 5");
 
             bool InstructionHierarchyCheck = false;
 
@@ -654,7 +654,7 @@ namespace NuclearOptionVWS
 
                 if (!InstructionHierarchyCheck & Plugin.I.LastHadPriortyOverride)
                 {
-                    //Plugin.I.Log(LogLevel.Info, "Clearing low priorty due to instructions nolonger being used");
+                    DebugMode.Log(LogLevel.Info, "Clearing low priorty due to instructions nolonger being used", "InstructionWarnings() 6");
                     Audio.ClearQueueLowPriority();
                     ResetAltitudeComplaintStatus();
                 }
@@ -682,13 +682,13 @@ namespace NuclearOptionVWS
             else if (!FlaresLowFired & PlayerAircraft.countermeasureManager.GetActiveCountermeasure().chargeable == false)
             {
                 FlaresLowFired = true;
-                //Plugin.I.Log(LogLevel.Info, "LowFlares");
+                DebugMode.Log(LogLevel.Info, "LowFlares", "InstructionWarnings() 7");
                 Audio.AddToQueue(CFG_InstructionHazards.Get("Flare").Value);
                 Audio.AddToQueue(CFG_AudioOut.Value);
             }
 
             //Jammer
-            //Plugin.I.Log(LogLevel.Info, "JAMMER: " + PlayerAircraft.GetPowerSupply().GetCharge());
+            DebugMode.Log(LogLevel.Info, "JAMMER: " + PlayerAircraft.GetPowerSupply().GetCharge(), "InstructionWarnings() 8");
             if (PlayerAircraft.GetPowerSupply() != null)
             {
                 if (PlayerAircraft.GetPowerSupply().GetCharge() > 0.6f)
@@ -702,10 +702,10 @@ namespace NuclearOptionVWS
                     Audio.AddToQueue(CFG_AudioOut.Value);
                 }
             }
-            //Plugin.I.Log(LogLevel.Info, "IR Sig: " + PlayerAircraft.GetIRSource().intensity);
+            DebugMode.Log(LogLevel.Info, "IR Sig: " + PlayerAircraft.GetIRSource().intensity, "InstructionWarnings() 9");
 
             UpdateAircraftHealth(PlayerAircraft);
-            //Plugin.I.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio());
+            DebugMode.Log(LogLevel.Info, "DMG: " + PlayerAircraft.partDamageTracker.GetDetachedRatio(), "InstructionWarnings() 10");
             if (CheckIfEjectAdvisable(PlayerAircraft)&!PlayerAircraft.HasEjected() & TimesEjectWarningIssued < CFG_EjectWarningRepeat.Value)
             {
                 if (Audio.AddToQueueNoDuplicates(CFG_InstructionHazards.Get("Eject").Value))
@@ -791,21 +791,21 @@ namespace NuclearOptionVWS
                 }
                 GeneralHealth += p.hitPoints;
 
-                //Plugin.I.Log(LogLevel.Info,"HP"+p.hitPoints);
+                DebugMode.Log(LogLevel.Info,"HP"+p.hitPoints, "GetAircraftHealthComponents()");
             }
         }
         private void UpdateAircraftHealth(Aircraft Player)
         {
-            //Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad - TimeOfLastHealthCheck);
+            //DebugMode.Log(LogLevel.Info, Time.timeSinceLevelLoad - TimeOfLastHealthCheck, "UpdateAircraftHealth() 1");
             if (Time.timeSinceLevelLoad - TimeOfLastHealthCheck > 0.1)
             {
-                //Plugin.I.Log(LogLevel.Info, Time.timeSinceLevelLoad);
+                DebugMode.Log(LogLevel.Info, Time.timeSinceLevelLoad, "UpdateAircraftHealth() 2");
                 float MaxAeroHitpoints = 0;
                 float MaxGenHitpoints = 0;
 
                 GetAircraftHealthComponents(Player,out MaxGenHitpoints,out MaxAeroHitpoints);
 
-                //Plugin.I.Log(LogLevel.Info, MaxAeroHitpoints + ":" + MaxGenHitpoints);
+                DebugMode.Log(LogLevel.Info, MaxAeroHitpoints + ":" + MaxGenHitpoints, "UpdateAircraftHealth() 3");
 
                 //if (MaxAeroHitpoints > MaxAerodynamicHealth)
                 //{
@@ -813,13 +813,13 @@ namespace NuclearOptionVWS
                 //}
                 if (MaxGenHitpoints > MaxAircraftHealth)
                 {
-                    //Plugin.I.Log(LogLevel.Info,"Setting Max HP");
+                    DebugMode.Log(LogLevel.Info,"Setting Max HP", "UpdateAircraftHealth() 4");
                     MaxAircraftHealth = MaxGenHitpoints;
                 }
                 else 
                 {
-                    //Plugin.I.Log(LogLevel.Info, "GEN:" + MaxGenHitpoints / MaxAircraftHealth);
-                    //Plugin.I.Log(LogLevel.Info, MaxGenHitpoints + "/" + MaxAircraftHealth);
+                    DebugMode.Log(LogLevel.Info, "GEN:" + MaxGenHitpoints / MaxAircraftHealth, "UpdateAircraftHealth() 5");
+                    DebugMode.Log(LogLevel.Info, MaxGenHitpoints + "/" + MaxAircraftHealth, "UpdateAircraftHealth() 6");
                     if (MaxGenHitpoints / MaxAircraftHealth < 0.2)
                     {
                         FatalDamage = true;
@@ -896,13 +896,13 @@ namespace NuclearOptionVWS
             {
                 
                 TotalSummedSpeed += Aircraft.speed;
-                //Plugin.I.Log(LogLevel.Info, Aircraft.speed);
+                DebugMode.Log(LogLevel.Info, Aircraft.speed, "CheckBINGOWarning() 1");
                 TotalFuelUsed += FuelUsedOnTick;
                 TotalEvaluations++;
-                //Plugin.I.Log(LogLevel.Info, "TotalEval: " + TotalEvaluations);
+                DebugMode.Log(LogLevel.Info, "TotalEval: " + TotalEvaluations, "CheckBINGOWarning() 2");
 
                 int NumberOfAircraftEngines = Aircraft.engineStates.Count;
-                //Plugin.I.Log(LogLevel.Info, "EngineNum: " + NumberOfAircraftEngines);
+                DebugMode.Log(LogLevel.Info, "EngineNum: " + NumberOfAircraftEngines, "CheckBINGOWarning() 3");
                 if (NumberOfAircraftEngines < 1)
                 {
                     return;
@@ -940,10 +940,10 @@ namespace NuclearOptionVWS
                             BINGOTriggered = true;
                         }
 
-                        //Plugin.I.Log(LogLevel.Info, "AVG FUEL OUT: " + AVGFuelConsumption);
-                        //Plugin.I.Log(LogLevel.Info, "AVG SPEED: " + AVGSpeed);
-                        //Plugin.I.Log(LogLevel.Info, "SECONDS TO RTB: " + SecondsToRTB);
-                        //Plugin.I.Log(LogLevel.Info, "FUEL LEFT: " + Aircraft.GetFuelQuantity());
+                        DebugMode.Log(LogLevel.Info, "AVG FUEL OUT: " + AVGFuelConsumption, "CheckBINGOWarning() 4");
+                        DebugMode.Log(LogLevel.Info, "AVG SPEED: " + AVGSpeed, "CheckBINGOWarning() 5");
+                        DebugMode.Log(LogLevel.Info, "SECONDS TO RTB: " + SecondsToRTB, "CheckBINGOWarning() 6");
+                        DebugMode.Log(LogLevel.Info, "FUEL LEFT: " + Aircraft.GetFuelQuantity(), "CheckBINGOWarning() 7");
                     }
                 }
             }
@@ -1012,7 +1012,7 @@ namespace NuclearOptionVWS
                 }
                 else if(Seeker == "IR")//If IR
                 {
-                    //Plugin.I.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity");
+                    DebugMode.Log(LogLevel.Info, "IR SIGNATURE: PlayerAircraft.GetIRSource().intensity", "GetMissileResponseAudio()");
                     if (PlayerAircraft.GetIRSource().intensity < 4 || Distance < 2)
                     {
                         EndInstruction = "Flare";
@@ -1107,7 +1107,7 @@ namespace NuclearOptionVWS
         //    GetAircraftHealthComponents(PlayerAircraft, out GenHP, out AeroHP);
 
         //    Plugin.I.Log(LogLevel.Info, "GEN:" + GenHP / MaxAircraftHealth);
-        //    //Plugin.I.Log(LogLevel.Info, "AER:" + AeroHP / MaxAerodynamicHealth);
+        //    DebugMode.Log(LogLevel.Info, "AER:" + AeroHP / MaxAerodynamicHealth);
         //    if(GenHP/MaxAircraftHealth < 0.15 )//|| AeroHP/MaxAerodynamicHealth < 0.4)
         //    {
         //        FatalDamage = true;

@@ -67,12 +67,12 @@ namespace NuclearOptionVWS
         public void SetPitch(float Pitch)
         {
             Source.pitch = Pitch;
-            //Plugin.I.Log(LogLevel.Info, "Request recieved to set pitch: " + Pitch);
+            DebugMode.Log(LogLevel.Info, "Request recieved to set pitch: " + Pitch, "SetPitch()");
         }
         public void ResetPitch()
         {
             Source.pitch = 1;
-            //Plugin.I.Log(LogLevel.Info, "Request recieved to reset pitch");
+            DebugMode.Log(LogLevel.Info, "Request recieved to reset pitch", "ResetPitch()");
         }
         public void AmendNoExceptionClause(bool NewValue)
         {
@@ -84,7 +84,7 @@ namespace NuclearOptionVWS
             {
                 return;
             }
-            //Plugin.I.Log(LogLevel.Info,"Stopping old Audio");
+            DebugMode.Log(LogLevel.Info,"Stopping old Audio", "Stop()");
             if(Source == null)
             {
                 return;//Ok this probably isnt nessecary but i have never used unity functions so if the code below causes a noticeable delay then this is probably helpful.
@@ -96,7 +96,7 @@ namespace NuclearOptionVWS
         public void PlayAudio(AudioClip Audio, bool SeeComplete = false, float Pitch = 1)//As these are meant for alarms, I will have the audio continue to play the whole audio until different audio is needed.
             //thats 33% more audio in every audio. Such a great innovation for appature science.
         {
-            //Plugin.I.Log(LogLevel.Info, "play request recieved");
+            DebugMode.Log(LogLevel.Info, "play request recieved", "PlayAudio() 1");
             //if (Source.clip != null)
             //{
             //    Plugin.I.Log(LogLevel.Message, "Currently: " + Source.clip.name + " will play " + Audio.name + ". Is playing: " + Source.isPlaying);
@@ -118,13 +118,13 @@ namespace NuclearOptionVWS
 
             if (Audio == Source.clip & Source.isPlaying)
             {
-                //Plugin.I.Log(LogLevel.Info, "Chose not to play audio. already playing");
+                DebugMode.Log(LogLevel.Info, "Chose not to play audio. already playing", "PlayAudio() 2");
             }
             else
             {
                 if (Audio != null)
                 {
-                    //Plugin.I.Log(LogLevel.Info, "Attempting to play " + Audio.name);
+                    DebugMode.Log(LogLevel.Info, "Attempting to play " + Audio.name, "PlayAudio() 3");
                     if (Audio != Source.clip && Source.isPlaying)
                     {
                         Stop();
@@ -147,11 +147,11 @@ namespace NuclearOptionVWS
                     {
                         Stop();
                     }
-                    //Plugin.I.Log(LogLevel.Info, "Playing Null");
-                    //Plugin.I.Log(LogLevel.Error, "Could Not Play, Audio Null");
+                    DebugMode.Log(LogLevel.Info, "Playing Null", "PlayAudio() 4");
+                    DebugMode.Log(LogLevel.Error, "Could Not Play, Audio Null", "PlayAudio() 5");
                 }
             }
-            //Plugin.I.Log(LogLevel.Info, "attempt play finished");
+            DebugMode.Log(LogLevel.Info, "attempt play finished", "PlayAudio() 6");
         }
         
         //public AudioClip SimpleSearchForAudio(string Name)
